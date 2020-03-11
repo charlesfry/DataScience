@@ -17,11 +17,9 @@ for iter = 1:num_iters
     %       of the cost function (computeCost) and gradient here.
     %
     error = (X * theta) - y;
+
+    theta = theta - (alpha / m) * (error' * X)'
     
-    for k = 1:2
-      newthetas(k) = theta(k) - (alpha / m) * sum( error .* X(:,k));
-    endfor
-    theta = [newthetas(1); newthetas(2)]
     % ============================================================
 
     % Save the cost J in every iteration    
@@ -30,3 +28,4 @@ for iter = 1:num_iters
 end
 
 end
+
