@@ -1,4 +1,4 @@
-# Thanks to
+# Thanks to Serigne at Kaggle for advising this code
 # https://www.kaggle.com/serigne/stacked-regressions-top-4-on-leaderboard
 
 import sys
