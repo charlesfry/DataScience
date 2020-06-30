@@ -14,19 +14,12 @@ from scipy import stats
 from scipy.stats import norm, skew
 pd.set_option('display.float_format', lambda x: '{:.3f}'.format(x))
 # Limited floats output to 3 decimal points
-import warnings
-def ignore_warn(*args, **kwargs):
-    pass
-warnings.warn = ignore_warn
+
 pd.set_option('display.float_format', lambda x: '{:.3f}'\
               .format(x)) #Limiting floats output to 3 decimal points
 
 # ignore annoying warning (from sklearn and seaborn)
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn import preprocessing
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import mean_squared_error, r2_score
 from scipy.special import boxcox1p
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -66,7 +59,7 @@ train = train.drop(train[(train['GrLivArea']>4000) & \
                          (train['SalePrice']<300000)].index)
 
 # Check again to verify that data is removed
-fig, ax = plt.subplots()
+_, ax = plt.subplots()
 ax.scatter(x = train['GrLivArea'], y = train['SalePrice'])
 plt.ylabel("SalePrice",fontsize=13)
 plt.xlabel("GrLivArea",fontsize=13)
@@ -85,7 +78,7 @@ plt.ylabel("Frequency")
 plt.title('SalePrice distribution')
 
 # Get the QQ-plot
-_ = plt.figure()
+fig = plt.figure()
 res = stats.probplot(train['SalePrice'],plot=plt)
 plt.show()
 
@@ -109,13 +102,12 @@ plt.ylabel("Frequency")
 plt.title("SalePrice Distribution")
 
 # Get another QQ-plot
-_ = plt.figure()
+fig = plt.figure()
 res = stats.probplot(train["SalePrice"], plot=plt)
 plt.show()
 
 # Features Engineering
 # Start by concatenating train and test data
-m_train = train.shape[0]
 m_test = test.shape[0]
 y_train = train.SalePrice.values
 m_train = train.shape[0]
@@ -305,17 +297,14 @@ train = all_data[:m_train]
 test = all_data[m_train:]
 
 # Importing the modelling software
-from sklearn.linear_model import ElasticNet, Lasso, \
-    BayesianRidge, LassoLarsIC
-from sklearn.ensemble import RandomForestRegressor, \
-    GradientBoostingRegressor
+from sklearn.linear_model import ElasticNet, Lasso
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import RobustScaler
 from sklearn.base import BaseEstimator, TransformerMixin, \
     RegressorMixin, clone
-from sklearn.model_selection import KFold, cross_val_score, \
-    train_test_split
+from sklearn.model_selection import KFold, cross_val_score
 from sklearn.metrics import mean_squared_error
 import xgboost as xgb
 import lightgbm as lgb
@@ -385,12 +374,11 @@ class AveragingModels(BaseEstimator, RegressorMixin,
                       TransformerMixin) :
     def __init__(self, models):
         self.models = models
-
-    # clone original models to fit data into
-    def fit(self, X, y):
         self.cloned_models = \
             [clone(x) for x in self.models]
 
+    # clone original models to fit data into
+    def fit(self, X, y):
         # train clones
         for model in self.cloned_models:
             model.fit(X,y)
