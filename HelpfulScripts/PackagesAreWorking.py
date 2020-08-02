@@ -71,6 +71,6 @@ except :
     print("Unity ML-Agents not installed")
     error_packages.append('ML-Agents')
 
-print("Testing complete")
+print("\nTesting complete")
 if len(error_packages) > 0 :
     print(f'Failed to access: \n{error_packages}')
