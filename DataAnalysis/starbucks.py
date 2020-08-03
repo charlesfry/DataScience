@@ -227,24 +227,24 @@ def gridsearch(model, parameters) :
     ('clf', model)
   ])
 
-  clf = GridSearchCV(pipe,param_grid=parameters,scoring=nir_score,verbose=3)
+  clf = GridSearchCV(pipe,param_grid=parameters,scoring=nir_score,verbose=0)
   return clf
 
 weightscale = 98.8/1.2
 
 params = {
-    'clf__booster':['gbtree','dart'],
-    'clf__max_bin':[256,512],
+    'clf__booster':['dart'], # dart is best so far
+    'clf__max_bin':[256,128], # 256 > 512
     'clf__n_jobs':[-2],
     'clf__random_state':[seed],
-    'clf__n_estimators':[100,200],
+    'clf__n_estimators':[200,300], # 200 > 100
     'clf__learning_rate':[.025],
-    'clf__reg_lambda':[1,1.5],
-    'clf__max_depth':[3,8],
-    'clf__colsample_bytree':[1,.9,.8],
-    'clf__scale_pos_weight':[weightscale]
+    'clf__reg_lambda':[1.5,1.7], # 1.5 > 1
+    'clf__max_depth':[8,9,10], # 8 > 3
+    'clf__colsample_bytree':[.8,.7,.6], # .8 > .9,1
+    'clf__scale_pos_weight':[1,weightscale]
 }
-
+t = time()
 print('\nFitting xgboost...')
 xgb = XGBClassifier()
 clf = gridsearch(xgb,parameters=params)
@@ -254,8 +254,22 @@ print('\n\n----------------')
 print(clf.best_params_)
 
 y_pred = clf.predict(X_test)
-print(NIR(y_test,y_pred))
-
+print(f'\nNIR score: {NIR(y_test,y_pred)}')
+print('Fitted in {:.1f}s'.format(time()-t))
+print(f'\n{y_test.sum()}')
+print(y_pred.sum())
 import joblib
 filename = 'finalized_clf_dummies.sav'
 joblib.dump(clf.best_estimator_, filename)
+
+
+#{'clf__booster': 'dart',
+# 'clf__colsample_bytree': 0.8,
+# 'clf__learning_rate': 0.025,
+# 'clf__max_bin': 256,
+# 'clf__max_depth': 8,
+# 'clf__n_estimators': 200,
+# 'clf__n_jobs': -2,
+# 'clf__random_state': 69,
+# 'clf__reg_lambda': 1.5,
+# 'clf__scale_pos_weight': 82.33333333333333}
