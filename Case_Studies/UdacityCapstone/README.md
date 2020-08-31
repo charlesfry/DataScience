@@ -1,5 +1,6 @@
 # UdacityCapstone
 Starbucks Capstone project for Udacity
+The medium article was published at https://medium.com/@AmishWarlord/predicting-starbucks-customer-behavior-119fc3a43480
 
 run the following command in your command prompt prior to running this iPython notebook:
 pip install -r requirements.txt 
