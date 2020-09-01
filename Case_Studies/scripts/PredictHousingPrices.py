@@ -1,4 +1,4 @@
-# Thanks to Serigne at Kaggle for advising this code
+# Thanks to Serigne at kaggle for advising this code
 # https://www.kaggle.com/serigne/stacked-regressions-top-4-on-leaderboard
 
 import sys
@@ -26,9 +26,9 @@ from scipy.special import boxcox1p
 # get our data, the first is labeled, the second is unlabeled, and we
 #   are trying to predict the second
 train = pd.read_csv(
-    "../input/Kaggle/HousingPrices/train.csv")
+    "../input/kaggle/HousingPrices/train.csv")
 test = pd.read_csv(
-    "../input/Kaggle/HousingPrices/test.csv")
+    "../input/kaggle/HousingPrices/test.csv")
 
 # Save the ID column
 train_ID = train['Id']

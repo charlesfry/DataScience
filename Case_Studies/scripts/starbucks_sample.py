@@ -61,7 +61,7 @@ import seaborn as sns
 # %matplotlib inline
 
 # load in the data
-train_data = pd.read_csv('../input/training.csv')
+train_data = pd.read_csv('../input/starbucks_practice_training.csv')
 train_data.head()
 
 import numpy as np
