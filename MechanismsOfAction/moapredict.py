@@ -158,3 +158,30 @@ time() - t
 
 Y_train.sum().sort_values(ascending=True)
 
+
+from sklearn.model_selection import GridSearchCV
+
+def make_grid_pipe(clf,y,param_grid=None) :
+    num_samples = y.sum() * .8 - 1
+    pipe = Pipeline([
+        ('scaler', StandardScaler()),
+        ('sampling', SMOTE(k_neighbors=max(5, int(y.sum() * .8 - 1)),
+                           random_state=seed,sampling_strategy='minority')),
+        ('clf', clf)
+    ])
+
+    poop = XGBClassifier()
+    if param_grid is None :
+        param_grid = {
+            'max_depth':[-1,3,6,9],
+            'bagging_seed':[seed],
+            'colsample_bytree':[1,.9,.7],
+            'lambda':[1,1.2,1.4],
+            'scale_pos_weight':[1,y.shape[0]/y.sum()]
+        }
+
+    model = GridSearchCV(estimator=pipe,
+                       param_grid=param_grid,
+                       cv=3,scoring='neg_log_loss')
+
+    return model
