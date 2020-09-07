@@ -13,20 +13,34 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import os
+import tensorflow as tf
+import random
 
 # %matplotlib inline
 
+#!pip install -U xgboost
+
+from google.colab import drive
+drive.mount('/content/gdrive')
+from google.colab import files
+import json
+
+def seed_everything(seed=2020):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    
 seed = 69
-np.random.seed(seed)
+seed_everything(seed)
 
-train = pd.read_csv('train_features.csv')
-target = pd.read_csv('train_targets_scored.csv')
-
+train = pd.read_csv('/content/gdrive/My Drive/input/moa/train_features.csv')
+target = pd.read_csv('/content/gdrive/My Drive/input/moa/train_targets_scored.csv')
 print(f'train shape: {train.shape}')
 print(f'target shape: {target.shape}')
 train.head()
 
-print(target.shape)
 target.head()
 
 clean_train = train.drop(columns=['sig_id'])
@@ -70,18 +84,13 @@ convert_cat_cols(train).head()
 
 from sklearn.model_selection import train_test_split
 
-# split into train/test sets
-X_train,X_test,Y_train,Y_test = \
-    train_test_split(clean_train,clean_target,shuffle=True,random_state=seed)
-
-# let's check how unbalanced our classes are
-Y_train.mean().mean()
+# let's check for balance
+clean_target = target.drop(columns='sig_id')
+clean_target.mean().mean()
 
 # very unbalanced. We may use metrics other than accuracy to judge our interim results
 # however, the final judgment is based on log loss of liklihood, so we will ultimately 
 # compare this to a log loss estimate
-
-y_train,y_test = Y_train.iloc[:,0],Y_test.iloc[:,0]
 
 '''
 corrmat = pd.concat([clean_train,target.iloc[:,1]],axis=1).corr(method='spearman')['5-alpha_reductase_inhibitor']\
@@ -95,9 +104,13 @@ fig = sns.barplot(y=corrmat.index,x=corrmat.values,
 # import our evaluation methods
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import confusion_matrix, log_loss, roc_auc_score
+from sklearn.model_selection import cross_val_score
 
 # import oversampling techniques
 from imblearn.over_sampling import SMOTE
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 def score(y_test,y_pred,method='log_loss') :
     if method == 'log_loss' : return log_loss(y_test,y_pred)
@@ -113,51 +126,171 @@ from imblearn.pipeline import Pipeline
 from sklearn.ensemble import StackingClassifier
 from sklearn.multioutput import MultiOutputClassifier
 
-def make_pipeline(clf) :
+def make_pipe(clf,y) :
+    num_samples = y.sum() * .8 - 1
     pipe = Pipeline([
         ('scaler',StandardScaler()),
-        #('sampling',SMOTE()),
+        ('sampling',SMOTE(k_neighbors=max(5,int(y.sum()*.8-1)))),
         ('clf',clf)
     ])
     return pipe
 
+def non_smote_pipe(clf,y) :
+    pipe = Pipeline([
+        ('scaler',StandardScaler()),
+        ('clf',clf)
+    ])
+    return pipe
+
+def fit_score_pipe(pipe,X,y) :
+    X_train,X_test,y_train,y_test = train_test_split(
+        X,y,stratify=y,
+        test_size=.2,random_state=seed)
+    pipe.fit(X_train.copy(),y_train.copy())
+    y_pred = pipe.predict_proba(X_test)
+    return log_loss(y_test,y_pred,labels=[0,1])
+
+def single_sample_score_pipe(pipe,df,target,col) :
+    n = 8
+    repeat_rows = df[target[col]==1]
+    repeat_target = target[target[col]==1][col]
+
+    dup_df = df.copy()
+    dup_target = pd.Series(target[col])
+    for i in range(n) :
+        dup_df = pd.concat([dup_df,repeat_rows])
+        dup_target = dup_target.append(repeat_target)
+
+    X_train,X_test,y_train,y_test = train_test_split(
+        dup_df,dup_target,test_size=.2,
+        stratify=dup_target,
+        random_state=seed)
+    
+    
+
+    pipe.fit(X_train.copy(),y_train.copy())
+    y_pred = pipe.predict_proba(X_test)
+    return log_loss(y_test,y_pred,labels=[0,1])
+
 def pipe_gridsearch(pipe,param_grid=None) :
     pass
 
-clf = LGBMClassifier()
-pipe = make_pipeline(clf)
-pipe.fit(X_train,y_train)
-y_pred = pipe.predict_proba(X_test)
+lgbm_params = {
+    'num_leaves': 491,
+    'min_child_weight': 0.03,
+    'feature_fraction': 0.3,
+    'bagging_fraction': 0.4,
+    'min_data_in_leaf': 106,
+    'objective': 'binary',
+    'max_depth': -1,
+    'learning_rate': 0.005,
+    "boosting_type": "gbdt",
+    "bagging_seed": seed,
+    "metric": 'binary_logloss',
+    "verbosity": 0,
+    'reg_alpha': 0.4,
+    'reg_lambda': 0.6,
+    'random_state': seed
+}
 
-log_loss(y_test,y_pred)
-poop = 0
+clf = LGBMClassifier(**lgbm_params)
 
-def make_pipe_dict(clf,X_train=X_train,X_test=X_test,Y_train=Y_train,Y_test=Y_test) :
-    pipe_dict = {}
+def repeat_sample(X,y,n=2) :
+    repeat_rows = X[y==1]
+    repeat_target = y[y==1]
+
+    dup_df = X.copy()
+    dup_target = y.copy()
+
+    while sum(dup_target < 7) :
+
+        dup_df = pd.concat([dup_df,repeat_rows])
+        dup_target = dup_target.append(repeat_target)
+
+
+    return dup_df,dup_target
+
+def make_pipe_dict(pipe_dict,loss_dict,clf,df,Y,reload=False) :
     scores = 0
-    _X_train,_X_test,_Y_train,_Y_test = X_train.copy(),X_test.copy(),Y_train.copy(),Y_test.copy()
-    for col in Y_train.keys() :
-        y_train, y_test = _Y_train[col],_Y_test[col]
-        pipe = make_pipeline(clf)
-        pipe.fit(_X_train,y_train)
-        y_pred = pipe.predict(_X_test)
-        scores += log_loss(y_test,y_pred,labels=[0,1])
+    for i,col in enumerate(Y.keys()) :
+        if col == 'sig_id' : continue # unnecessary since we dropped it, but in case we forget on the test set...
+        if col in pipe_dict and not reload : 
+            continue
+        start_time = time()
+
+        X = df.copy()
+        y = Y[col].copy()
+
+        pipe = make_grid_pipe(clf,y)
+
+        if y.sum() > 6 :
+            loss = fit_score_pipe(pipe,X,y)
+        else :
+            print(f'\tToo few samples in {col}. Number of positive examples: {y.sum()}')
+            X,y = repeat_sample(X,y)
+
+        loss = fit_score_pipe(pipe,X,y)
+        scores += loss
+
+        print('{}\t\t{}\t\t{:.5f}'
+            .format(str(datetime.timedelta(seconds=time() - start_time))[:7],
+                col, loss))
+
         pipe_dict[col] = pipe
-    scores /= len(_Y_train.keys())
+        loss_dict[col] = loss
+
+        print(pipe.best_estimator_.best_params_)
+
+        if i % 20 == 0 :
+            print('\tpickling model...')
+            with open('/content/gdrive/My Drive/input/moa/pipe_dict.pkl','wb') as handle :
+                pickle.dump(pipe_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open('/content/gdrive/My Drive/input/moa/loss_dict.pkl','wb') as handle :
+                pickle.dump(loss_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    scores /= len(Y.keys())
     print(f'Score: {scores}')
-    return pipe_dict
+    return pipe_dict,loss_dict
 
 from time import time
+import datetime
+import pickle
+
+grid_pipe_dict = {}
+for col in clean_target.keys() :
+    try :
+        with open(f'/content/gdrive/My Drive/input/moa/models/{col}.pkl','rb') as handle :
+            grid_pipe_dict[col] = pickle.load(handle)
+    except FileNotFoundError :
+        continue
+with open('/content/gdrive/My Drive/input/moa/grid_loss_dict.pkl','rb') as handle :
+    grid_loss_dict = pickle.load(handle)
 
 t = time()
 lgbm = LGBMClassifier()
-pipe_dict = make_pipe_dict(lgbm)
-pipe_dict
+#pipe_dict,loss_dict = make_pipe_dict(pipe_dict,loss_dict,lgbm,clean_train,clean_target)
 
-time() - t
+print('\nTime elapsed: {:.1f}s'.format(time() - t))
 
-Y_train.sum().sort_values(ascending=True)
+with open('/content/gdrive/My Drive/input/moa/pipe_dict.pkl','wb+') as handle :
+    pickle.dump(pipe_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+clean_target.sum(axis=0).sort_values(ascending=True)
+
+clean_target.shape
+
+clean_train.shape
+
+Y = clean_target
+Y.laxative.sum()
+
+import tensorflow
+from tensorflow.keras import layers
+
+def create_model() :
+    pass
+
+#pipe_dict,loss_dict = make_pipe_dict(pipe_dict,loss_dict,lgbm,clean_train,clean_target,reload=True)
 
 from sklearn.model_selection import GridSearchCV
 
@@ -165,7 +298,7 @@ def make_grid_pipe(clf,y,param_grid=None) :
     num_samples = y.sum() * .8 - 1
     pipe = Pipeline([
         ('scaler', StandardScaler()),
-        ('sampling', SMOTE(k_neighbors=max(5, int(y.sum() * .8 - 1)),
+        ('sampling', SMOTE(k_neighbors=5,
                            random_state=seed,sampling_strategy='minority')),
         ('clf', clf)
     ])
@@ -174,14 +307,138 @@ def make_grid_pipe(clf,y,param_grid=None) :
     if param_grid is None :
         param_grid = {
             'max_depth':[-1,3,6,9],
-            'bagging_seed':[seed],
             'colsample_bytree':[1,.9,.7],
-            'lambda':[1,1.2,1.4],
-            'scale_pos_weight':[1,y.shape[0]/y.sum()]
+            'reg_lambda':[1,1.2,1.4],
         }
+    
+    #param_grid['clf__scale_pos_weight'] = [1,y.shape[0]/y.sum()]
 
-    model = GridSearchCV(estimator=pipe,
+    model = GridSearchCV(pipe,
                        param_grid=param_grid,
                        cv=3,scoring='neg_log_loss')
 
     return model
+
+def fit_grid_pipe(pipe,X,y) : 
+    X_train,X_test,y_train,y_test = train_test_split(
+        X,y,stratify=y,
+        test_size=.2,random_state=seed)
+    pipe.fit(X_train.copy(),y_train.copy())
+    y_pred = pipe.predict_proba(X_test)
+    print(pipe.best_params_)
+    return log_loss(y_test,y_pred,labels=[0,1])
+
+def grid_repeat_sample(X,y,n=2) :
+    repeat_rows = X[y==1]
+    repeat_target = y[y==1]
+
+    dup_df = X.copy()
+    dup_target = y.copy()
+
+    catcher = 0
+    while dup_target.sum() < n :
+        noise = np.random.randn(*repeat_rows.shape) * .005
+        dup_df = pd.concat([dup_df,repeat_rows + noise])
+        dup_target = dup_target.append(repeat_target)
+
+        catcher += 1
+        assert catcher < n + 10
+
+    new_df = pd.concat([dup_df,dup_target],axis=1).sample(frac=1,random_state=seed)
+    new_X,new_y = new_df.iloc[:,:-1],new_df.iloc[:,-1]
+
+    return new_X,new_y
+
+def append_to_grid(model,grid) :
+    params = model.best_params_
+    for k,v in params.items() :
+        if k in params : 
+            grid[k] = list(set(grid[k]).union(set(params[k])))
+    return grid
+
+def make_grid_pipe_dict(pipe_dict,loss_dict,clf,df,Y,clf_params=None,reload=False) :
+    scores = 0
+    param_grid = clf_params.copy()
+    for i,col in enumerate(Y.keys()) :
+        if col == 'sig_id' : continue # unnecessary since we dropped it, but in case we forget on the test set...
+        if col in loss_dict and not reload and : 
+            if loss_dict[col] < 0.018 :
+                print(f'already completed {col} with loss: {loss_dict[col]}')
+                param_grid = append_to_grid(pipe_dict.best_params_)
+                continue
+            else : 
+                print(f'{col} loss too high at: {loss_dict[col]}')
+                param_grid = append_to_grid(pipe_dict[col],param_grid)
+                
+        start_time = time()
+
+        X = df.copy()
+        y = Y[col].copy()
+
+        pipe = make_grid_pipe(clf,y,param_grid)
+
+        n = 24
+        if y.sum() < n :
+            print(f'\tToo few samples in {col}. Number of positive examples: {y.sum()}')
+            X,y = grid_repeat_sample(X,y,n)           
+
+        loss = fit_grid_pipe(pipe,X,y)
+        scores += loss
+
+        print('{}\t\t{}\t\t{:.5f}'
+            .format(str(datetime.timedelta(seconds=time() - start_time))[:7],
+                col, loss))
+
+        pipe_dict[col] = pipe
+        #param_dict[col] = pipe.best_params_
+        loss_dict[col] = loss
+
+
+        # save model
+        print('\tpickling model...')
+        with open(f'/content/gdrive/My Drive/input/moa/models/{col}.pkl','wb+') as handle :
+            pickle.dump(pipe, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open('/content/gdrive/My Drive/input/moa/grid_pipe_dict.pkl','wb+') as handle :
+            pickle.dump(pipe_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open('/content/gdrive/My Drive/input/moa/grid_loss_dict.pkl','wb+') as handle :
+            pickle.dump(loss_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    scores /= len(Y.keys())
+    print(f'Score: {scores}')
+    return pipe_dict,loss_dict
+
+param_grid = {
+    'sampling__random_state':[seed],
+    'clf__reg_lambda':[1,9,12],
+    'clf__colsample_bytree':[.7,.5],
+    'clf__metric':['binary_logloss'],
+}
+
+clf = LGBMClassifier()
+
+t = time()
+grid_pipe_dict,grid_loss_dict = make_grid_pipe_dict(grid_pipe_dict,grid_loss_dict,clf,clean_train,clean_target,param_grid,reload=False)
+print('\nTime elapsed: {:.1f}s'.format(time() - t))
+
+score = 0
+total = 0
+for i,(k,v) in enumerate(grid_loss_dict.items()) :
+    score += v
+    total = i
+score /= total
+
+test = pd.read_csv('/content/gdrive/My Drive/input/moa/test_features.csv')
+submission = submit(grid_pipe_dict,test,target.keys())
+
+def submit(pipe_dict,X_test,keys) :
+    y_pred = pd.DataFrame({
+        'sig_id':X_test['sig_id']
+    })
+    for col in keys :
+        if col == 'sig_id' : continue
+        model = pipe_dict[col].copy()
+        y_pred[col] = model.predict_proba(X_test)
+
+    y_pred.to_csv('/content/gdrive/My Drive/input/moa/submission.csv')
+
+    return y_pred
