@@ -7,28 +7,34 @@ class CumulativeNodeSampling(BaseEstimator,TransformerMixin) :
     class for Cumulative Node Sampling: a way to drop less-important
     features from a high-dimensional dataset
     """
-    def __init__(self,feat_importance:np.array,sample=.9):
+    def __init__(self,sample=.9,clf=None):
         """
 
-        :param feat_importance: a numpy array that contains the information on what features are most important
         :param sample: how much of the explainatory power you want to keep
+        :param clf: optional classifier to evaluate feature importances
         """
 
-        self.feat_importance = feat_importance.copy()
         self.sample = sample
+        self.clf = clf
 
         assert sample > 0
         assert sample <= 1
 
     def fit(self, X, y=None):
-        feats = self.feat_importance
         sample = self.sample
 
-        feats /= feats.sum()
+        if clf :
+            feats = clf.fit(X,y).feature_importances_
+        else :
+            feats = pd.DataFrame([X,y]).corr(method='spearman').iloc[-1,:-1]
+            feats = np.abs(feats)
+
+        feats = feats / feats.sum()
         feat_df = pd.DataFrame({
-            'feats':X.index,
+            'feats':(-feats).argsort(),
             'values':feats
         })
+        return feat_df
 
         feat_df.sort_values(ascending=False,inplace=True)
 
@@ -46,10 +52,12 @@ class CumulativeNodeSampling(BaseEstimator,TransformerMixin) :
         return self
 
     def transform(self,X,y=None):
+        pass
 
 
-
-
+butt = np.array([1,2,3,4,5])
+print((-butt).argsort())
+quit()
 
 if __name__ == "__main__":
     from sklearn.datasets import load_iris
@@ -64,7 +72,7 @@ if __name__ == "__main__":
 
     clf = LGBMClassifier()
 
-    clf.fit(X,y)
+    sample = CumulativeNodeSampling()
+    butt = sample.fit(X,y)
 
-    feats = clf.feature_importances_
-    print(feats.sum())
+    print(butt)
