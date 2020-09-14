@@ -1,20 +1,16 @@
 # import essentials
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
 import os
 import random
-import pickle
-from time import time
-import datetime
+
+import numpy as np
+import pandas as pd
+
 
 def seed_everything(seed=0):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     tf.random.set_seed(seed)
-
 
 seed = 69
 seed_everything(seed)
@@ -43,9 +39,7 @@ target = labels.iloc[:,1:].copy()
 # build model
 
 import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.keras.layers import BatchNormalization,Conv2D,Dropout,Dense
-from tensorflow_addons.layers import WeightNormalization
+from tensorflow.keras.layers import BatchNormalization, Dense
 from tensorflow.keras.models import Sequential
 def build_model() :
     """
