@@ -47,9 +47,7 @@ from sklearn.metrics import log_loss
 
 def build_model() :
     model = Sequential([
-        BatchNormalization(),
-        WeightNormalization(Dense(2048,activation='relu')),
-        Dropout(.4),
+
         
         BatchNormalization(),
         WeightNormalization(Dense(1028,activation='relu')),
