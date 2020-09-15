@@ -47,7 +47,6 @@ from sklearn.metrics import log_loss
 
 def build_model() :
     model = Sequential([
-
         
         BatchNormalization(),
         WeightNormalization(Dense(1028,activation='relu')),
@@ -78,9 +77,9 @@ def evaluate(model) :
     for train,test in kfold.split(X,Y) :
         X_train,X_test = X[train],X[test]
         Y_train,Y_test = Y[train],Y[test]
-        model.fit(X_train,Y_train,epochs=14)
+        model.fit(X_train,Y_train,epochs=60) # change epochs to 14
         scores = np.append(scores,model.evaluate(X_test,Y_test))
-
+        break # remove
     return scores.mean()
 
 model = build_model()
@@ -89,11 +88,11 @@ print(f'Score: {score}')
 
 model = build_model()
 
-model.fit(X,Y,epochs=14)
+model.fit(X,Y,epochs=60)
 preds = model.predict(clean_df(test))
 submission = pd.DataFrame(data=np.column_stack((test.sig_id, preds)), columns=target.keys())
 
 #submission.to_csv('../input/MoA/submission.csv', index=False)
 #print(pd.read_csv('../input/MoA/submission.csv').head())
 
-model.save('./saved_models/deepmoa/deepmoa')
+#model.save('./saved_models/deepmoa/deepmoa')

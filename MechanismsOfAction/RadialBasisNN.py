@@ -43,13 +43,13 @@ def seed_everything(seed=0):
     np.random.seed(seed)
     tf.random.set_seed(seed)
 
-
 seed = 69
 seed_everything(seed)
 
 train = pd.read_csv('../input/MoA/train_features.csv')
 target = pd.read_csv('../input/MoA/train_targets_scored.csv')
 test = pd.read_csv('../input/MoA/test_features.csv')
+print(train.shape)
 
 
 def clean_df(_df):
@@ -70,23 +70,19 @@ X = clean_df(train).values
 Y = target.iloc[:, 1:].values
 
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
+from tensorflow.keras.layers import Dense, Dropout, BatchNormalization,RNN,Input
 from tensorflow_addons.layers import WeightNormalization
 
 
 def build_model():
     model = Sequential([
+
         BatchNormalization(),
-        WeightNormalization(Dense(2048, activation='relu')),
+        Dense(2048, activation='sigmoid'),
         Dropout(.4),
 
         BatchNormalization(),
-        RBFLayer(512, .4),
-        Dropout(.4),
-
-        BatchNormalization(),
-        RBFLayer(256, .3),
-        Dropout(.2),
+        RBFLayer(1024,.2),
 
         BatchNormalization(),
         WeightNormalization(Dense(206, activation='sigmoid')),

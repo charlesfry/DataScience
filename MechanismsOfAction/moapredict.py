@@ -2,21 +2,23 @@
 import os
 import random
 import pickle
+from math import ceil
 
 import numpy as np
 import pandas as pd
 
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
+from sklearn.feature_selection import RFE
 
 def seed_everything(seed=0):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
-    try :
-        tf.random.set_seed(seed)
-    except :
-        pass
+    #try :
+    #    tf.random.set_seed(seed)
+    #except :
+    #    pass
 
 seed = 69
 seed_everything(seed)
@@ -75,7 +77,6 @@ def append_to_grid(grid,params) :
     return grid
 
 
-from sklearn.feature_selection import RFE
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
@@ -109,6 +110,12 @@ def repeat_sample(X,y,n) :
     assert np.isnan(new_y.values).sum() == 0, f'there are {new_y.isna().sum()} errors'
 
     return new_X.values, new_y.values
+
+def make_rfe(X,y,rfe_clf,keep_feats=600) :
+    step = ceil((X.shape[1] - keep_feats) / 2)
+    rfe = RFE(estimator=rfe_clf,n_features_to_select=keep_feats,step=step)
+    rfe.fit(X,y)
+    return rfe
 
 def make_pipe(clf,rfe,param_grid) :
     pipe = Pipeline([
@@ -153,13 +160,41 @@ xgb_params = {'colsample_bytree': 0.6522,
 xgb = XGBClassifier(**xgb_params)
 lgbm = LGBMClassifier(**xgb_params)
 
-grid = {
+param_grid = {
         'colsample_bytree': [69],
         'gamma': [69],
         'learning_rate': [96],
         'max_delta_step': [96],
         'seed':[696969696]
 }
-from sklearn.datasets import make_classification
-butt,poop = make_classification(n_samples=15,n_features=10,random_state=seed)
 
+def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
+                rfe_clf=xgb, param_grid=None) :
+    if param_grid is None:
+        param_grid = param_grid
+
+    cleaned_input = clean_input(train)
+
+    for col in Y.keys() :
+        if col == 'sig_id' : continue
+
+        X = cleaned_input.copy()
+        y = Y[col].copy()
+
+        if col in rfe_dict :
+            rfe = rfe_dict[col]
+        else :
+            rfe = make_rfe(X=X,y=y,rfe_clf=rfe_clf,keep_feats=600)
+
+        grid_pipe = make_pipe(clf=clf,)
+
+    return pipe_dict,rfe_dict,loss_dict
+
+
+pipe_dict,rfe_dict,loss_dict = build_dicts(pipe_dict=pipe_dict,rfe_dict=rfe_dict,loss_dict=loss_dict,train=train,
+            Y=labels,clf=xgb,rfe_clf=xgb,param_grid=param_grid)
+
+X = train
+print(X[X['cp_type']=='ctl_vehicle'])
+print(X[X['cp_type']=='ctl_vehicle'].shape)
+print(labels[X['cp_type']=='ctl_vehicle'].sum().sum())
