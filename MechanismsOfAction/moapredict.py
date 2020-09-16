@@ -3,6 +3,8 @@ import os
 import random
 import pickle
 from math import ceil
+import datetime
+from time import time
 
 import numpy as np
 import pandas as pd
@@ -10,6 +12,7 @@ import pandas as pd
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 from sklearn.feature_selection import RFE
+from sklearn.metrics import log_loss
 
 def seed_everything(seed=0):
     random.seed(seed)
@@ -52,6 +55,7 @@ def load_models(labels=labels) :
         try:
             with open(f'./xgboost/{col}') as hand :
                 pipe_dict[col] = pickle.load(hand)
+                print(f'Loaded {col}')
         except FileNotFoundError:
             pass
         try :
@@ -64,18 +68,17 @@ def load_models(labels=labels) :
             loss_dict = pickle.load(hand)
     except FileNotFoundError:
         pass
-
+    print('Loaded dictionaries...\n\n\n')
     return pipe_dict,rfe_dict,loss_dict
 
 
 def append_to_grid(grid,params) :
 
     for k,v in grid.items() :
-        if k in params :
-            grid[k] = list(set(v).union({params[k]}))
+        if k[5:] in params : # clf__estimator__ = 16 characters
+            grid[k] = list(set(v).union({params[k[16:]]}))
 
     return grid
-
 
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -99,7 +102,7 @@ def repeat_sample(X,y,n) :
         row += noise
         new_df = new_df.append(row)
 
-        assert np.isnan(new_df.values).sum() == 0, print(f'NaN values detected: {new_df[new_df.isna().any(axis=1)]}')
+    assert np.isnan(new_df.values).sum() == 0, print(f'NaN values detected: {new_df[new_df.isna().any(axis=1)]}')
 
     new_df = new_df.sample(frac=1, random_state=seed)
 
@@ -111,36 +114,49 @@ def repeat_sample(X,y,n) :
 
     return new_X.values, new_y.values
 
-def make_rfe(X,y,rfe_clf,keep_feats=600) :
-    step = ceil((X.shape[1] - keep_feats) / 2)
+def make_rfe(X_train,y_train,rfe_clf,keep_feats=600) :
+    step = ceil((X_train.shape[1] - keep_feats) / 2)
     rfe = RFE(estimator=rfe_clf,n_features_to_select=keep_feats,step=step)
-    rfe.fit(X,y)
+    rfe.fit(X_train,y_train)
     return rfe
 
-def make_pipe(clf,rfe,param_grid) :
+def make_pipe(clf,param_grid) :
     pipe = Pipeline([
         ('scaler',StandardScaler()),
-        ('rfe',rfe),
         ('clf',clf)
     ])
 
-    grid = GridSearchCV(pipe,param_grid)
+    grid = GridSearchCV(pipe,param_grid,cv=3,error_score='raise')
     return grid
 
-def fit_pipe(pipe,X_train,y_train) :
-    pass
+from sklearn.model_selection import train_test_split
 
+def split_X_y(X,y) :
+    n = 2
+    if y.sum() < n:
+        X, y = repeat_sample(X, y, n)
 
-def fit_models(pipe_dict,rfe_dict,loss_dict,train=train,labels=labels,) :
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=seed, stratify=y)
 
-    clean_X = clean_input(train)
-    Y = labels
+    n = 28
+    if y.sum() < n:
+        print(f'\tOnly {y_train.sum()} samples in y_train. Increasing to {n}...')
+        X_train, y_train = repeat_sample(X_train, y_train, n)
 
-    for col in labels :
-        if col == 'sig_id' : continue
+    return X_train,X_test,y_train,y_test
 
-        X = clean_X.copy()
-        y = Y[col].copy()
+def fit_score_pipe(pipe,X_train,X_test,y_train,y_test) :
+
+    assert np.isnan(X_train).sum().sum() == 0, f'{np.isnan(X_train).sum()}'
+    assert np.isnan(X_test).sum().sum() == 0
+    assert np.isnan(y_train).sum().sum() == 0
+    assert np.isnan(y_test).sum().sum() == 0
+
+    pipe.fit(X_train,y_train)
+    pred = pipe.predict(X_test)
+    loss = log_loss(y_test,pred,labels=[0,1])
+    print(f'\tbest params:{pipe.best_estimator_.get_params()}\n')
+    return pipe.best_estimator_,loss
 
 # run it
 
@@ -158,18 +174,19 @@ xgb_params = {'colsample_bytree': 0.6522,
 }
 
 xgb = XGBClassifier(**xgb_params)
+rfe_xgb = XGBClassifier(**xgb_params)
 lgbm = LGBMClassifier(**xgb_params)
 
 param_grid = {
-        'colsample_bytree': [69],
-        'gamma': [69],
-        'learning_rate': [96],
-        'max_delta_step': [96],
-        'seed':[696969696]
+        'clf__colsample_bytree': [.5,.8],
+        'clf__gamma': [3,4],
+        'clf__seed':[69],
+        'clf__max_depth':[5,13]
 }
 
 def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
-                rfe_clf=xgb, param_grid=None) :
+                rfe_clf=rfe_xgb, param_grid=None, reload=None) :
+
     if param_grid is None:
         param_grid = param_grid
 
@@ -177,24 +194,51 @@ def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
 
     for col in Y.keys() :
         if col == 'sig_id' : continue
+        t = time()
+        print(f'Evaluating {col}...')
 
         X = cleaned_input.copy()
         y = Y[col].copy()
 
+        X_train,X_test,y_train,y_test = split_X_y(X,y)
+
         if col in rfe_dict :
             rfe = rfe_dict[col]
         else :
-            rfe = make_rfe(X=X,y=y,rfe_clf=rfe_clf,keep_feats=600)
+            rfe = make_rfe(X_train,y_train,rfe_clf=rfe_clf,keep_feats=600)
+            rfe_dict[col] = rfe
 
-        grid_pipe = make_pipe(clf=clf,)
+        X_train,X_test = rfe.transform(X_train),rfe.transform(X_test)
+
+        if col in pipe_dict and reload is None :
+            print(f'\tAlready fitted {col}')
+            pipe = pipe_dict[col]
+            loss = loss_dict[col]
+        else :
+            grid_pipe = make_pipe(clf=clf,param_grid=param_grid)
+            pipe, loss = fit_score_pipe(grid_pipe,X_train,X_test,y_train,y_test)
+
+        assert loss >= 0, f'\nError! {col} loss is {loss}'
+
+        pipe_dict[col] = pipe
+        loss_dict[col] = loss
+
+        with open(f'./xgboost/{col}', 'wb+') as hand:
+            pickle.dump(pipe_dict[col], hand)
+        with open(f'./xgboost/rfe/{col}', 'wb+') as hand:
+            pickle.dump(rfe, hand)
+        with open(f'./xgboost/dicts/loss_dict', 'wb+') as hand:
+            pickle.dump(loss_dict, hand)
+
+        print('{}\t\t{}\t\t{:.5f}\n'
+              .format(str(datetime.timedelta(seconds=time() - t))[:7],
+                      col, loss))
+
+    print(f'\nFinal Score: {np.mean(list(loss_dict.values()))}')
 
     return pipe_dict,rfe_dict,loss_dict
 
 
 pipe_dict,rfe_dict,loss_dict = build_dicts(pipe_dict=pipe_dict,rfe_dict=rfe_dict,loss_dict=loss_dict,train=train,
-            Y=labels,clf=xgb,rfe_clf=xgb,param_grid=param_grid)
+            Y=labels,clf=xgb,rfe_clf=rfe_xgb,param_grid=param_grid)
 
-X = train
-print(X[X['cp_type']=='ctl_vehicle'])
-print(X[X['cp_type']=='ctl_vehicle'].shape)
-print(labels[X['cp_type']=='ctl_vehicle'].sum().sum())
