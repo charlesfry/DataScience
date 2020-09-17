@@ -53,18 +53,18 @@ def load_models(labels=labels) :
 
     for col in labels.keys() :
         try:
-            with open(f'./xgboost/{col}') as hand :
+            with open(f'./xgboost/{col}','rb') as hand :
                 pipe_dict[col] = pickle.load(hand)
                 print(f'Loaded {col}')
         except FileNotFoundError:
             pass
         try :
-            with open(f'./xgboost/rfe/{col}') as hand :
+            with open(f'./xgboost/rfe/{col}','rb') as hand :
                 rfe_dict[col] = pickle.load(hand)
         except FileNotFoundError:
             pass
     try :
-        with open('./xgboost/dicts/loss_dict') as hand :
+        with open('./xgboost/dicts/loss_dict','rb') as hand :
             loss_dict = pickle.load(hand)
     except FileNotFoundError:
         pass
@@ -115,9 +115,11 @@ def repeat_sample(X,y,n) :
     return new_X.values, new_y.values
 
 def make_rfe(X_train,y_train,rfe_clf,keep_feats=600) :
+    print(f'\tFitting RFE')
     step = ceil((X_train.shape[1] - keep_feats) / 2)
     rfe = RFE(estimator=rfe_clf,n_features_to_select=keep_feats,step=step)
     rfe.fit(X_train,y_train)
+    print('\tRFE fit successfully')
     return rfe
 
 def make_pipe(clf,param_grid) :
@@ -153,10 +155,12 @@ def fit_score_pipe(pipe,X_train,X_test,y_train,y_test) :
     assert np.isnan(y_test).sum().sum() == 0
 
     pipe.fit(X_train,y_train)
+    pred = pipe.predict(X_train)
+    bias = log_loss(y_train,pred)
     pred = pipe.predict(X_test)
     loss = log_loss(y_test,pred,labels=[0,1])
     print(f'\tbest params:{pipe.best_estimator_.get_params()}\n')
-    return pipe.best_estimator_,loss
+    return pipe.best_estimator_,loss,bias
 
 # run it
 
@@ -164,24 +168,35 @@ def fit_score_pipe(pipe,X_train,X_test,y_train,y_test) :
 pipe_dict,rfe_dict,loss_dict = load_models()
 
 xgb_params = {'colsample_bytree': 0.6522,
-          'gamma': 3.6975,
-          'learning_rate': 0.05,
-          'max_delta_step': 2.0706,
-          'max_depth': 10,
-          'min_child_weight': 31.58,
-          'n_estimators': 166,
-          'subsample': 0.8639
+              'gamma': 3.6975,
+              'learning_rate': 0.05,
+              'max_delta_step': 2.0706,
+              'max_depth': 10,
+              'min_child_weight': 31.58,
+              'n_estimators': 166,
+              'seed':seed,
+              #'objective':'binary:logistic',
+}
+
+lgbm_params = {'colsample_bytree': 0.6522,
+               'learning_rate': 0.05,
+               'max_delta_step': 2.0706,
+               'max_depth': 6,
+               'num_leaves':72,
+               'min_child_weight': 31.58,
+               'n_estimators': 166,
+               'subsample': 0.8639,
+               'seed':seed,
 }
 
 xgb = XGBClassifier(**xgb_params)
-rfe_xgb = XGBClassifier(**xgb_params)
+rfe_xgb = LGBMClassifier(**lgbm_params)
 lgbm = LGBMClassifier(**xgb_params)
 
 param_grid = {
-        'clf__colsample_bytree': [.5,.8],
-        'clf__gamma': [3,4],
-        'clf__seed':[69],
-        'clf__max_depth':[5,13]
+        'clf__colsample_bytree': [.5],
+        #'clf__gamma': [3,4],
+        'clf__max_depth':[13]
 }
 
 def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
@@ -208,7 +223,7 @@ def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
             rfe = make_rfe(X_train,y_train,rfe_clf=rfe_clf,keep_feats=600)
             rfe_dict[col] = rfe
 
-        X_train,X_test = rfe.transform(X_train),rfe.transform(X_test)
+        #X_train,X_test = rfe.transform(X_train),rfe.transform(X_test)
 
         if col in pipe_dict and reload is None :
             print(f'\tAlready fitted {col}')
@@ -216,7 +231,7 @@ def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
             loss = loss_dict[col]
         else :
             grid_pipe = make_pipe(clf=clf,param_grid=param_grid)
-            pipe, loss = fit_score_pipe(grid_pipe,X_train,X_test,y_train,y_test)
+            pipe, loss, bias = fit_score_pipe(grid_pipe,X_train,X_test,y_train,y_test)
 
         assert loss >= 0, f'\nError! {col} loss is {loss}'
 
@@ -230,6 +245,7 @@ def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
         with open(f'./xgboost/dicts/loss_dict', 'wb+') as hand:
             pickle.dump(loss_dict, hand)
 
+        print(f'\t{col} bias: {bias}')
         print('{}\t\t{}\t\t{:.5f}\n'
               .format(str(datetime.timedelta(seconds=time() - t))[:7],
                       col, loss))
