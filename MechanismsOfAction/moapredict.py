@@ -12,6 +12,7 @@ import pandas as pd
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 from sklearn.feature_selection import RFE
+from sklearn.feature_selection import SelectKBest,f_classif
 from sklearn.metrics import log_loss
 
 def seed_everything(seed=0):
@@ -80,7 +81,8 @@ def append_to_grid(grid,params) :
 
     return grid
 
-from sklearn.pipeline import Pipeline
+from imblearn.pipeline import Pipeline
+from imblearn.over_sampling import SMOTE
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
 
@@ -99,7 +101,7 @@ def repeat_sample(X,y,n) :
         row = repeat_rows.sample(frac=1).iloc[0].copy()
 
         noise = np.append(np.random.randn(1, len(row) - 1), np.array([0])) * .01
-        row += noise
+        # row += noise
         new_df = new_df.append(row)
 
     assert np.isnan(new_df.values).sum() == 0, print(f'NaN values detected: {new_df[new_df.isna().any(axis=1)]}')
@@ -125,6 +127,8 @@ def make_rfe(X_train,y_train,rfe_clf,keep_feats=600) :
 def make_pipe(clf,param_grid) :
     pipe = Pipeline([
         ('scaler',StandardScaler()),
+        ('selectkbest', SelectKBest(score_func=f_classif,k=100)),
+        ('smote',SMOTE(random_state=seed,k_neighbors=5)),
         ('clf',clf)
     ])
 
@@ -156,10 +160,14 @@ def fit_score_pipe(pipe,X_train,X_test,y_train,y_test) :
 
     pipe.fit(X_train,y_train)
     pred = pipe.predict(X_train)
-    bias = log_loss(y_train,pred)
+    bias = log_loss(y_train,pred,labels=[0,1])
     pred = pipe.predict(X_test)
     loss = log_loss(y_test,pred,labels=[0,1])
-    print(f'\tbest params:{pipe.best_estimator_.get_params()}\n')
+    best_params = pipe.best_estimator_.get_params()
+
+    for k in pipe.param_grid :
+        print(f'{k}:{best_params[k]}')
+
     return pipe.best_estimator_,loss,bias
 
 # run it
@@ -167,40 +175,44 @@ def fit_score_pipe(pipe,X_train,X_test,y_train,y_test) :
 # load dicts
 pipe_dict,rfe_dict,loss_dict = load_models()
 
-xgb_params = {'colsample_bytree': 0.6522,
-              'gamma': 3.6975,
-              'learning_rate': 0.05,
-              'max_delta_step': 2.0706,
-              'max_depth': 10,
-              'min_child_weight': 31.58,
+xgb_params = {
+              # 'colsample_bytree': 0.6522,
+              # 'gamma': 3.6975,
+              # 'learning_rate': 0.05,
+              # 'max_delta_step': 2.0706,
+              # 'max_depth': 10,
+              # 'min_child_weight': 31.58,
               'n_estimators': 166,
               'seed':seed,
-              #'objective':'binary:logistic',
+              # 'objective':'binary:logistic',
 }
 
-lgbm_params = {'colsample_bytree': 0.6522,
-               'learning_rate': 0.05,
-               'max_delta_step': 2.0706,
-               'max_depth': 6,
-               'num_leaves':72,
-               'min_child_weight': 31.58,
-               'n_estimators': 166,
-               'subsample': 0.8639,
-               'seed':seed,
+lgbm_params = {
+    'num_leaves': 300,
+    #'min_child_weight': 0.03,
+    #'objective': 'binary',
+    'max_depth': 8,
+    'learning_rate': 0.005,
+    "boosting_type": "gbdt",
+    "bagging_seed": seed,
+    #"metric": 'binary_logloss',
+    "verbosity": 0,
+    'random_state': seed
 }
 
 xgb = XGBClassifier(**xgb_params)
-rfe_xgb = LGBMClassifier(**lgbm_params)
-lgbm = LGBMClassifier(**xgb_params)
+lgbm = LGBMClassifier(**lgbm_params)
+rfe_clf = XGBClassifier(**xgb_params)
 
 param_grid = {
-        'clf__colsample_bytree': [.5],
+        'clf__colsample_bytree': [.5,.8],
         #'clf__gamma': [3,4],
-        'clf__max_depth':[13]
+        'clf__max_depth':[5,8],
+        'clf__reg_lambda':[3,7,9]
 }
 
 def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
-                rfe_clf=rfe_xgb, param_grid=None, reload=None) :
+                rfe_clf=rfe_clf, param_grid=None, reload=None) :
 
     if param_grid is None:
         param_grid = param_grid
@@ -217,18 +229,19 @@ def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
 
         X_train,X_test,y_train,y_test = split_X_y(X,y)
 
-        if col in rfe_dict :
-            rfe = rfe_dict[col]
-        else :
-            rfe = make_rfe(X_train,y_train,rfe_clf=rfe_clf,keep_feats=600)
-            rfe_dict[col] = rfe
+        # if col in pipe_dict and reload is None :
+        #     rfe = rfe_dict[col]
+        # else :
+        #     rfe = make_rfe(X_train,y_train,rfe_clf=rfe_clf,keep_feats=600)
+        #     rfe_dict[col] = rfe
 
-        #X_train,X_test = rfe.transform(X_train),rfe.transform(X_test)
+        # X_train,X_test = rfe.transform(X_train),rfe.transform(X_test)
 
         if col in pipe_dict and reload is None :
             print(f'\tAlready fitted {col}')
             pipe = pipe_dict[col]
             loss = loss_dict[col]
+            bias = None
         else :
             grid_pipe = make_pipe(clf=clf,param_grid=param_grid)
             pipe, loss, bias = fit_score_pipe(grid_pipe,X_train,X_test,y_train,y_test)
@@ -240,12 +253,12 @@ def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
 
         with open(f'./xgboost/{col}', 'wb+') as hand:
             pickle.dump(pipe_dict[col], hand)
-        with open(f'./xgboost/rfe/{col}', 'wb+') as hand:
-            pickle.dump(rfe, hand)
+        # with open(f'./xgboost/rfe/{col}', 'wb+') as hand:
+        #     pickle.dump(rfe, hand)
         with open(f'./xgboost/dicts/loss_dict', 'wb+') as hand:
             pickle.dump(loss_dict, hand)
 
-        print(f'\t{col} bias: {bias}')
+        if bias : print(f'\t{col} bias: {bias}')
         print('{}\t\t{}\t\t{:.5f}\n'
               .format(str(datetime.timedelta(seconds=time() - t))[:7],
                       col, loss))
@@ -254,7 +267,10 @@ def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
 
     return pipe_dict,rfe_dict,loss_dict
 
+xgb = XGBClassifier(**xgb_params)
+
+clf = XGBClassifier(**xgb_params)
 
 pipe_dict,rfe_dict,loss_dict = build_dicts(pipe_dict=pipe_dict,rfe_dict=rfe_dict,loss_dict=loss_dict,train=train,
-            Y=labels,clf=xgb,rfe_clf=rfe_xgb,param_grid=param_grid)
+            Y=labels,clf=clf,rfe_clf=rfe_clf,param_grid=param_grid)
 
