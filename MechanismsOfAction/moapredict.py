@@ -54,18 +54,18 @@ def load_models(labels=labels) :
 
     for col in labels.keys() :
         try:
-            with open(f'./xgboost/{col}','rb') as hand :
+            with open(f'input/{col}', 'rb') as hand :
                 pipe_dict[col] = pickle.load(hand)
                 print(f'Loaded {col}')
         except FileNotFoundError:
             pass
         try :
-            with open(f'./xgboost/rfe/{col}','rb') as hand :
+            with open(f'input/rfe/{col}', 'rb') as hand :
                 rfe_dict[col] = pickle.load(hand)
         except FileNotFoundError:
             pass
     try :
-        with open('./xgboost/dicts/loss_dict','rb') as hand :
+        with open('input/dicts/loss_dict', 'rb') as hand :
             loss_dict = pickle.load(hand)
     except FileNotFoundError:
         pass
@@ -251,11 +251,11 @@ def build_dicts(pipe_dict, rfe_dict, loss_dict,train=train,Y=labels,clf=xgb,
         pipe_dict[col] = pipe
         loss_dict[col] = loss
 
-        with open(f'./xgboost/{col}', 'wb+') as hand:
+        with open(f'input/{col}', 'wb+') as hand:
             pickle.dump(pipe_dict[col], hand)
         # with open(f'./xgboost/rfe/{col}', 'wb+') as hand:
         #     pickle.dump(rfe, hand)
-        with open(f'./xgboost/dicts/loss_dict', 'wb+') as hand:
+        with open(f'input/dicts/loss_dict', 'wb+') as hand:
             pickle.dump(loss_dict, hand)
 
         if bias : print(f'\t{col} bias: {bias}')
