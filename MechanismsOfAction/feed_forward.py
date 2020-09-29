@@ -23,17 +23,14 @@ train = pd.read_csv('../input/MoA/train_features.csv')
 target = pd.read_csv('../input/MoA/train_targets_scored.csv')
 test = pd.read_csv('../input/MoA/test_features.csv')
 
+train = train[train['cp_type']=='ctl_vehicle']
+
 def clean_df(_df) :
     df = _df.copy()
-    df = df.drop(columns=['sig_id'])
-    df['vehicle'] = df.cp_type.apply(
-        lambda x: x == 'ctl_vehicle'
-    ).astype(np.int8)
-    df.drop(columns=['cp_type'],inplace=True)
-    df['d2'] = df.cp_dose.apply(
+    df.drop(columns=['sig_id','cp_type'],inplace=True)
+    df['cp_dose'] = df.cp_dose.apply(
         lambda x: x == 'D2'
     ).astype(np.int8)
-    df.drop(columns=['cp_dose'],inplace=True)
     return df
 
 X = clean_df(train).values
@@ -91,7 +88,8 @@ model = build_model()
 model.fit(X,Y,epochs=60)
 preds = model.predict(clean_df(test))
 submission = pd.DataFrame(data=np.column_stack((test.sig_id, preds)), columns=target.keys())
-
+control_mask = test['cp_type'] == 'ctl_vehicle'
+submission[control_mask] = 0
 #submission.to_csv('../input/MoA/submission.csv', index=False)
 #print(pd.read_csv('../input/MoA/submission.csv').head())
 
