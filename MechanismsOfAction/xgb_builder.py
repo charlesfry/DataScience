@@ -170,6 +170,31 @@ def build_dicts(pipe_dict,loss_dict,train,labels,param_grid,params) :
 
     return pipe_dict,loss_dict
 
+def baseline_run() :
+    clf_params = {
+        'colsample_bytree': 0.6522,
+        'gamma': 3.6975,
+        'learning_rate': 0.05,
+        'max_delta_step': 2.0706,
+        'max_depth': 10,
+        'min_child_weight': 31.5800,
+        'n_estimators': 166,
+        'subsample': 0.8639
+    }
+    for col in labels.keys() :
+
+        if col == 'sig_id' : continue
+        X_train,X_test,y_train,y_test = train_test_split(train.iloc[:,1:],labels[col])
+        pipe = Pipeline([
+            ('encoder',OrdinalEncoder()),
+            ('scaler',StandardScaler()),
+            ('clf',XGBClassifier(**clf_params))
+        ])
+
+        pipe.fit(X_train,y_train)
+        y_pred = pipe.predict(X_test)
+
+        print(f'{col}: {log_loss(y_test, y_pred)}')
 
 
 pipe_dict,loss_dict = load_models(labels)
