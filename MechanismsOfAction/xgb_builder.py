@@ -95,6 +95,30 @@ def make_gridsearch(param_grid) :
 
     return gridsearch
 
+def repeat_sample(X,y,n) :
+    assert X.shape[0] == y.shape[0], f'shapes dont match. X shape: {X.shape[1]} y shape: {len(y)}'
+
+    new_X = X.copy()
+    new_target = y.copy()
+
+    new_df = pd.DataFrame(np.column_stack((new_X, new_target)))
+    repeat_rows = new_df[new_df.iloc[:, -1] == 1]
+
+    start = new_target.sum()
+
+    for i in range(int(start), n):
+        row = repeat_rows.sample(frac=1).iloc[0].copy()
+
+        noise = np.append(np.random.randn(1, len(row) - 1), np.array([0])) * .01
+        # row += noise
+        new_df = new_df.append(row)
+
+    new_df = new_df.sample(frac=1, random_state=seed)
+
+    new_X, new_y = new_df.iloc[:, :-1], new_df.iloc[:, -1]
+
+    return new_X.values, new_y.values
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import log_loss
 
@@ -106,22 +130,21 @@ def fit_gridsearch(gridsearch,X,y) :
     :param y:
     :return: pipe and loss
     """
-    if y.sum() > 1 :
-        X_train, X_test, y_train, y_test = train_test_split(X,y,random_state=seed,stratify=y)
-    else :
-        X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=seed)
+
+    if y.sum() < 4 :
+        X,y = repeat_sample(X,y,4)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=seed)
 
     gridsearch.fit(X_train,y_train)
     preds = gridsearch.predict(X_test)
-    return gridsearch.best_estimator_,log_loss(y_test,preds)
-
-
+    return gridsearch.best_estimator_,log_loss(y_test,preds,labels=[0,1])
 
 
 def build_dicts(pipe_dict,loss_dict,train,labels,param_grid,params) :
 
-    X = train.iloc[:,1:].copy()
-    X = X[train['cp_type']!='ctl_vehicle']
+    X_train = train.iloc[:,1:].copy()
+    X_train = X_train[train['cp_type']!='ctl_vehicle']
     Y = labels[train['cp_type']!='ctl_vehicle']
 
 
@@ -139,7 +162,7 @@ def build_dicts(pipe_dict,loss_dict,train,labels,param_grid,params) :
         print(f'Fitting {col}...')
 
         y = Y[col].copy()
-
+        X = X_train.copy()
         gridsearch = make_gridsearch(param_grid=param_grid)
 
         pipe,loss = fit_gridsearch(gridsearch=gridsearch,X=X,y=y)
@@ -194,7 +217,7 @@ def baseline_run() :
         pipe.fit(X_train,y_train)
         y_pred = pipe.predict(X_test)
 
-        print(f'{col}: {log_loss(y_test, y_pred)}')
+        print(f'{col}: {log_loss(y_test, y_pred,labels=[0,1])}')
 
 
 pipe_dict,loss_dict = load_models(labels)
