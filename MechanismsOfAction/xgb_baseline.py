@@ -74,7 +74,7 @@ def make_gridsearch(clf,param_grid,params) :
     ])
 
     pipe.set_params(**params)
-    grid = GridSearchCV(estimator=pipe,param_grid=param_grid)
+    grid = GridSearchCV(estimator=pipe,param_grid=param_grid,cv=3)
     return grid
 
 params = {'clf__colsample_bytree': 0.6522,
