@@ -77,6 +77,16 @@ def make_gridsearch(clf,param_grid,params) :
     grid = GridSearchCV(estimator=pipe,param_grid=param_grid,cv=3)
     return grid
 
+def make_pipe(clf,param_grid,params) :
+    pipe = Pipeline([
+        ('encoder',OrdinalEncoder()),
+        ('scaler',StandardScaler()),
+        ('clf',clf)
+    ])
+
+    pipe.set_params(**params)
+    return pipe
+
 params = {'clf__colsample_bytree': 0.6522,
           'clf__gamma': 3.6975,
           'clf__learning_rate': 0.0503,
@@ -129,7 +139,7 @@ def fit_gridsearch(gridsearch,X,y) :
     if y.sum() < n :
         X,y = repeat_sample(X,y,n)
 
-    X_tr, X_te, y_tr, y_te = train_test_split(X, y, random_state=seed)
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, random_state=seed,stratify=y)
 
     # drop where cp_type==ctl_vehicle (baseline)
     ctl_mask = X_tr[:, 0] == 'ctl_vehicle'
@@ -142,7 +152,15 @@ def fit_gridsearch(gridsearch,X,y) :
 
     gridsearch.fit(X_tr,y_tr)
     preds = gridsearch.predict(X_te)
+
+    
+    print(np.unique(np.array(preds)))
+
+    print(np.unique(y_te))
+
+
     return gridsearch,log_loss(y_te,preds,labels=[0,1])
+    # return gridsearch.best_estimator_,log_loss(y_te,preds,labels=[0,1])
 
 def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) :
 
@@ -160,21 +178,21 @@ def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) 
         print(f'Fitting {col}...')
         xgb = XGBClassifier()
 
-        clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
-
         X = X_train.copy().to_numpy()
         y = Y[col].copy()
 
-
+        clf = make_pipe(clf=xgb, param_grid=param_grid, params=params)
+        # clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
 
         clf,loss = fit_gridsearch(clf,X,y)
 
-        pipe_dict[col] = clf.best_estimator_
+        print(type(clf))
+        pipe_dict[col] = clf
         loss_dict[col] = loss
 
-        with open(f'input/xgb_models/{col}', 'wb+') as hand:
+        with open(f'input/xgb_baseline/{col}', 'wb+') as hand:
             pickle.dump(pipe_dict[col], hand)
-        with open(f'input/xgb_models/loss_dict', 'wb+') as hand:
+        with open(f'input/xgb_baseline/loss_dict', 'wb+') as hand:
             pickle.dump(loss_dict, hand)
 
         print(f'\t{col} final params:\n{pipe_dict[col].named_steps["clf"].get_params()}')
