@@ -74,7 +74,7 @@ def make_gridsearch(clf,param_grid,params) :
     ])
 
     pipe.set_params(**params)
-    grid = GridSearchCV(estimator=pipe,param_grid=param_grid,cv=3,n_jobs=-1)
+    grid = GridSearchCV(estimator=pipe,param_grid=param_grid,cv=3)
     return grid
 
 def make_pipe(clf,params) :
@@ -135,11 +135,15 @@ def fit_gridsearch(clf,X,y) :
     :return: pipe and loss
     """
 
-    n = 8
+    n = 2
     if y.sum() < n :
         X,y = repeat_sample(X,y,n)
 
     X_tr, X_te, y_tr, y_te = train_test_split(X, y, random_state=seed,stratify=y)
+
+    n = 8
+    if y.sum() < n:
+        X_tr, y_tr = repeat_sample(X_tr, y_tr, n)
 
     # drop where cp_type==ctl_vehicle (baseline)
     ctl_mask = X_tr[:, 0] == 'ctl_vehicle'
@@ -157,7 +161,10 @@ def fit_gridsearch(clf,X,y) :
     loss = log_loss(y_te,preds,labels=[0,1])
 
     # return clf,loss
-    return clf.best_estimator_,loss
+    try :
+        return clf.best_estimator_,loss
+    except :
+        return clf,loss
 
 def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) :
 
@@ -178,8 +185,9 @@ def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) 
         X = X_train.copy().to_numpy()
         y = Y[col].copy()
 
-        #clf = make_pipe(clf=xgb, params=params)
-        clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
+
+        clf = make_pipe(clf=xgb, params=params)
+        #clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
 
         clf,loss = fit_gridsearch(clf,X,y)
 
