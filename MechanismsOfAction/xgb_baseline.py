@@ -74,7 +74,7 @@ def make_gridsearch(clf,param_grid,params) :
     ])
 
     pipe.set_params(**params)
-    grid = GridSearchCV(estimator=pipe,param_grid=param_grid,cv=3)
+    grid = GridSearchCV(estimator=pipe,param_grid=param_grid,cv=3,n_jobs=-1)
     return grid
 
 def make_pipe(clf,params) :
