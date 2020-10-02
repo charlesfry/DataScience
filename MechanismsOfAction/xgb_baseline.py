@@ -153,14 +153,11 @@ def fit_gridsearch(clf,X,y) :
     clf.fit(X_tr,y_tr)
     preds = clf.predict_proba(X_te)
     preds = np.ravel(preds[:,1]).astype(np.float)
-    print(f'y sum: {y_te.sum()}')
-    print(np.unique(y_te))
-    print(y_te.shape, preds.shape)
 
     loss = log_loss(y_te,preds,labels=[0,1])
-    print(f'\n\npoggers\n\n')
-    return clf,loss
-    # return gridsearch.best_estimator_,log_loss(y_te,preds,labels=[0,1])
+
+    # return clf,loss
+    return clf.best_estimator_,loss
 
 def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) :
 
@@ -171,7 +168,7 @@ def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) 
         if col == 'sig_id' : continue
 
         if col in pipe_dict :
-            print(f'{col} already fitted at loss {loss_dict[col]}')
+            print(f'\t{col} already fitted at loss {loss_dict[col]}')
             continue
         t = time()
 
@@ -181,8 +178,8 @@ def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) 
         X = X_train.copy().to_numpy()
         y = Y[col].copy()
 
-        clf = make_pipe(clf=xgb, params=params)
-        # clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
+        #clf = make_pipe(clf=xgb, params=params)
+        clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
 
         clf,loss = fit_gridsearch(clf,X,y)
 
@@ -195,7 +192,7 @@ def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) 
         with open(f'input/xgb_baseline/loss_dict', 'wb+') as hand:
             pickle.dump(loss_dict, hand)
 
-        print(f'\t{col} final params:\n{pipe_dict[col].named_steps["clf"].get_params()}')
+        print(f'\t{col} final params:\n{pipe_dict[col].named_steps["clf"].get_params()}\n')
 
         print('{}\t\t{}\t\t{:.5f}\n'.format(str(datetime.timedelta(seconds=time() - t))[:7],col, loss))
 
