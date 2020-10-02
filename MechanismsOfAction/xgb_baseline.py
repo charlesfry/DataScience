@@ -95,11 +95,11 @@ params = {'clf__colsample_bytree': 0.6522,
           'clf__min_child_weight': 31.5800,
           'clf__n_estimators': 166,
           'clf__subsample': 0.8639,
-          'clf__lambda': 1
+          #'clf__lambda': 1
 }
 
 gridsearch_params = {
-    'clf__lambda' : [3,9]
+    'clf__lambda' : [1,3,9]
 }
 
 def repeat_sample(X,y,n) :
