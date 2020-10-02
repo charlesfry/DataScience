@@ -148,12 +148,13 @@ def fit_gridsearch(clf,X,y) :
 
     ctl_mask = X_te[:, 0] == 'ctl_vehicle'
     X_te = X_te[~ctl_mask,:]
-    y_te = y_te[~ctl_mask]
+    y_te = np.ravel(y_te[~ctl_mask]).astype(np.int)
 
     clf.fit(X_tr,y_tr)
     preds = clf.predict_proba(X_te)
     preds = np.ravel(preds[:,1]).astype(np.float)
     print(f'y sum: {y_te.sum()}')
+    print(np.unique(y_te))
     print(y_te.shape, preds.shape)
 
     loss = log_loss(y_te,preds,labels=[0,1])
