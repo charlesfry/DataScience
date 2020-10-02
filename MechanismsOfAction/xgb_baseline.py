@@ -77,7 +77,7 @@ def make_gridsearch(clf,param_grid,params) :
     grid = GridSearchCV(estimator=pipe,param_grid=param_grid,cv=3)
     return grid
 
-def make_pipe(clf,param_grid,params) :
+def make_pipe(clf,params) :
     pipe = Pipeline([
         ('encoder',OrdinalEncoder()),
         ('scaler',StandardScaler()),
@@ -126,7 +126,7 @@ def repeat_sample(X,y,n) :
 
     return new_X.values, new_y.values
 
-def fit_gridsearch(gridsearch,X,y) :
+def fit_gridsearch(clf,X,y) :
     """
 
     :param gridsearch:
@@ -150,16 +150,15 @@ def fit_gridsearch(gridsearch,X,y) :
     X_te = X_te[~ctl_mask,:]
     y_te = y_te[~ctl_mask]
 
-    gridsearch.fit(X_tr,y_tr)
-    preds = gridsearch.predict(X_te)
+    clf.fit(X_tr,y_tr)
+    preds = clf.predict_proba(X_te)
+    preds = np.ravel(preds[:,1]).astype(np.float)
+    print(f'y sum: {y_te.sum()}')
+    print(y_te.shape, preds.shape)
 
-    
-    print(np.unique(np.array(preds)))
-
-    print(np.unique(y_te))
-
-
-    return gridsearch,log_loss(y_te,preds,labels=[0,1])
+    loss = log_loss(y_te,preds,labels=[0,1])
+    print(f'\n\npoggers\n\n')
+    return clf,loss
     # return gridsearch.best_estimator_,log_loss(y_te,preds,labels=[0,1])
 
 def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) :
@@ -181,7 +180,7 @@ def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) 
         X = X_train.copy().to_numpy()
         y = Y[col].copy()
 
-        clf = make_pipe(clf=xgb, param_grid=param_grid, params=params)
+        clf = make_pipe(clf=xgb, params=params)
         # clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
 
         clf,loss = fit_gridsearch(clf,X,y)
