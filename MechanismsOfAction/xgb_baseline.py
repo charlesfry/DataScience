@@ -12,6 +12,7 @@ from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
+from sklearn.base import clone
 
 import matplotlib.pyplot as plt
 
@@ -87,20 +88,7 @@ def make_pipe(clf,params) :
     pipe.set_params(**params)
     return pipe
 
-params = {'clf__colsample_bytree': 0.6522,
-          'clf__gamma': 3.6975,
-          'clf__learning_rate': 0.0503,
-          'clf__max_delta_step': 2.0706,
-          'clf__max_depth': 10,
-          'clf__min_child_weight': 31.5800,
-          'clf__n_estimators': 166,
-          'clf__subsample': 0.8639,
-          #'clf__lambda': 1
-}
 
-gridsearch_params = {
-    'clf__lambda' : [1,3,9]
-}
 
 def repeat_sample(X,y,n) :
     assert X.shape[0] == y.shape[0], f'shapes dont match. X shape: {X.shape[1]} y shape: {len(y)}'
@@ -166,34 +154,56 @@ def fit_gridsearch(clf,X,y) :
     except :
         return clf,loss
 
-def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) :
-
-    param_grid = append_to_grid(param_grid=gridsearch_params,params=params)
+def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y,reload=False) :
 
     for col in targets.keys() :
 
         if col == 'sig_id' : continue
 
-        if col in pipe_dict :
-            print(f'\t{col} already fitted at loss {loss_dict[col]}')
-            continue
         t = time()
-
-        print(f'Fitting {col}...')
-        xgb = XGBClassifier()
-
         X = X_train.copy().to_numpy()
         y = Y[col].copy()
+        param_grid = append_to_grid(param_grid=gridsearch_params, params=params)
+
+        if reload and col in pipe_dict :
+            if loss_dict[col] > 0.018 :
+                print(f'Refitting {col} with loss {loss_dict[col]}...')
+                pipe = clone(pipe_dict[col])
+                param_grid = append_to_grid(param_grid=gridsearch_params,params=pipe.get_params())
+                clf = make_gridsearch(pipe,param_grid=param_grid,params=pipe.get_params())
+                clf, loss = fit_gridsearch(clf, X, y)
+
+                if loss > loss_dict[col] :
+                    print(f'Loss still too high at {loss}')
+                    continue
+
+                pipe_dict[col] = clf
+                loss_dict[col] = loss
+
+            else :
+                loss = loss_dict[col]
+                print(f'\t{col} loss good enough at {loss}')
+                continue
+
+        elif col in pipe_dict :
+            loss = loss_dict[col]
+            print(f'\t{col} already fitted at loss {loss}')
+            continue
 
 
-        clf = make_pipe(clf=xgb, params=params)
-        #clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
+        else :
+            print(f'Fitting {col}...')
+            xgb = XGBClassifier()
 
-        clf,loss = fit_gridsearch(clf,X,y)
 
-        print(type(clf))
-        pipe_dict[col] = clf
-        loss_dict[col] = loss
+            clf = make_pipe(clf=xgb, params=params)
+            #clf = make_gridsearch(clf=xgb,param_grid=param_grid,params=params)
+
+            clf,loss = fit_gridsearch(clf,X,y)
+
+            print(type(clf))
+            pipe_dict[col] = clf
+            loss_dict[col] = loss
 
         with open(f'input/xgb_baseline/{col}', 'wb+') as hand:
             pickle.dump(pipe_dict[col], hand)
@@ -211,7 +221,24 @@ def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y) 
 
     return pipe_dict,loss_dict
 
+
+params = {'clf__colsample_bytree': 0.6522,
+          'clf__gamma': 3.6975,
+          'clf__learning_rate': 0.0503,
+          'clf__max_delta_step': 2.0706,
+          'clf__max_depth': 10,
+          'clf__min_child_weight': 31.5800,
+          'clf__n_estimators': 166,
+          'clf__subsample': 0.8639,
+          #'clf__lambda': 1
+}
+
+gridsearch_params = {
+    'clf__lambda' : [1,3,9],
+    'clf__n_estimators':[300]
+}
+
 pipe_dict,loss_dict = load_models(labels=targets)
 
 pipe_dict,loss_dict = build_dicts(pipe_dict=pipe_dict,loss_dict=loss_dict,targets=targets,params=params,
-                                             gridsearch_params=gridsearch_params,X_train=X_train,Y=Y)
+                                             gridsearch_params=gridsearch_params,X_train=X_train,Y=Y,reload=True)
