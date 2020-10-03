@@ -116,7 +116,7 @@ def repeat_sample(X,y,n) :
     for i in range(int(start), n):
         row = repeat_rows.sample(frac=1).iloc[0].copy()
 
-        noise = np.append(np.random.randn(1, len(row) - 1), np.array([0])) * .01
+        # noise = np.append(np.random.randn(1, len(row) - 1), np.array([0])) * .01
         # row += noise
         new_df = new_df.append(row)
 
