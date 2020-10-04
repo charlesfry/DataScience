@@ -173,7 +173,7 @@ def build_dicts(pipe_dict,loss_dict,targets,params,gridsearch_params,X_train,Y,r
                 clf = make_gridsearch(pipe,param_grid=param_grid,params=pipe.get_params())
                 clf, loss = fit_gridsearch(clf, X, y)
 
-                if loss > loss_dict[col] :
+                if loss >= loss_dict[col] :
                     print(f'Loss still too high at {loss}')
                     continue
 
