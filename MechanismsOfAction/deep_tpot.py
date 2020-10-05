@@ -11,7 +11,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 from pandas.api.types import is_numeric_dtype
 import tpot
-
+# is tpot good? gonna find out
 
 def seed_everything(seed=0):
     random.seed(seed)
