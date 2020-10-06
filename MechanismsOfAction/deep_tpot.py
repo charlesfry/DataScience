@@ -1,16 +1,16 @@
-import pandas as pd
-import numpy as np
-import random
-import os
-import sys
-from time import time
 import datetime
+import os
 import pickle
+import random
+from time import time
 
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder
-from pandas.api.types import is_numeric_dtype
+import numpy as np
+import pandas as pd
 import tpot
+from pandas.api.types import is_numeric_dtype
+from sklearn.preprocessing import LabelEncoder
+
+
 # is tpot good? gonna find out
 
 def seed_everything(seed=0):
