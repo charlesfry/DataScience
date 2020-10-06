@@ -119,6 +119,7 @@ def build_dicts(tpot_dict, loss_dict, train, targets, reload=False) :
         if col == 'sig_id' : continue
 
         if col in tpot_dict :
+            # pog
             print(f'\tAlready fitted {col} with loss {loss_dict[col]}')
             continue
 
