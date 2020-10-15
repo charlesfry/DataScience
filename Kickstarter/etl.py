@@ -8,6 +8,7 @@ import pickle
 from time import time
 import random
 
+
 def seed_everything(seed=0) :
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
