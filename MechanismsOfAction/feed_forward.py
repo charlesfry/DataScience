@@ -19,12 +19,13 @@ def seed_everything(seed=0):
 seed = 69
 seed_everything(seed)
 
-train = pd.read_csv('../input/MoA/train_features.csv')
-target = pd.read_csv('../input/MoA/train_targets_scored.csv')
-test = pd.read_csv('../input/MoA/test_features.csv')
+train = pd.read_csv('./input/train_features.csv')
+target = pd.read_csv('./input/train_targets_scored.csv')
+test = pd.read_csv('./input/test_features.csv')
 
 target = target[train['cp_type']!='ctl_vehicle']
 train = train[train['cp_type'] != 'ctl_vehicle']
+
 print(train.head())
 def clean_df(_df) :
     df = _df.copy()
@@ -118,7 +119,7 @@ preds = model.predict(clean_df(test))
 submission = pd.DataFrame(data=np.column_stack((test.sig_id, preds)), columns=target.keys())
 control_mask = test['cp_type'] == 'ctl_vehicle'
 submission[control_mask] = 0
-#submission.to_csv('../input/MoA/submission.csv', index=False)
-#print(pd.read_csv('../input/MoA/submission.csv').head())
+#submission.to_csv('./input/MoA/submission.csv', index=False)
+#print(pd.read_csv('./input/MoA/submission.csv').head())
 
 #model.save('./saved_models/deepmoa/deepmoa')

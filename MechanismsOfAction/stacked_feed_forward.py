@@ -1,0 +1,210 @@
+import tensorflow as tf
+import pandas as pd
+import numpy as np
+import os
+import random
+import pickle
+
+def seed_everything(seed=0):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+
+seed = 69
+seed_everything(seed)
+
+def repeat_sample(X,y,n) :
+    assert X.shape[0] == y.shape[0], f'shapes dont match. X shape: {X.shape[1]} y shape: {len(y)}'
+
+    new_X = X.copy()
+    new_target = y.copy()
+
+    new_df = pd.DataFrame(np.column_stack((new_X, new_target)))
+    repeat_rows = new_df[new_df.iloc[:, -1] == 1]
+
+    start = new_target.sum()
+
+    for i in range(int(start), n):
+        row = repeat_rows.sample(frac=1).iloc[0].copy()
+
+        noise = np.append(np.random.randn(1, len(row) - 1), np.array([0])) * .01
+        # row += noise
+        new_df = new_df.append(row)
+
+    new_df = new_df.sample(frac=1, random_state=seed)
+
+    new_X, new_y = new_df.iloc[:, :-1], new_df.iloc[:, -1]
+
+    return new_X.values, new_y.values
+
+train:pd.DataFrame = pd.read_csv('./input/train_features.csv')
+target:pd.DataFrame = pd.read_csv('./input/train_targets_scored.csv')
+test:pd.DataFrame = pd.read_csv('./input/test_features.csv')
+
+ctrl_mask = train['cp_type'] == 'ctl_vehicle'
+
+target = target[ctrl_mask]
+train = train[ctrl_mask]
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import BatchNormalization,Dropout,Dense
+from tensorflow_addons.layers import WeightNormalization
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from category_encoders import OrdinalEncoder
+
+
+def build_pipe():
+    model = Sequential([
+
+        BatchNormalization(),
+        WeightNormalization(Dense(1028, activation='relu', kernel_initializer='he_uniform', )),
+        Dropout(.2),
+
+        BatchNormalization(),
+        WeightNormalization(Dense(512, activation='relu', kernel_initializer='he_uniform', )),
+        Dropout(.2),
+
+        BatchNormalization(),
+        WeightNormalization(Dense(206, activation='sigmoid', kernel_initializer='glorot_uniform')),
+        Dropout(.2),
+
+        BatchNormalization(),
+        WeightNormalization(Dense(1, activation='sigmoid', kernel_initializer='glorot_uniform')),
+        Dropout(.2),
+    ])
+
+    model.compile(
+        optimizer='adam',
+        loss='binary_crossentropy',
+    )
+
+    clf = KerasClassifier(model)
+
+    pipe = Pipeline([
+        ('encoder',OrdinalEncoder()),
+        ('scaler',StandardScaler()),
+        ('clf',clf)
+    ])
+
+    return pipe
+
+
+
+callbacks = [
+    EarlyStopping(
+        # Stop training when loss is no longer improving
+        monitor="loss",
+        # "no longer improving" being defined as "no better than 1e-2 less"
+        min_delta=1e-5,
+        # "no longer improving" being further defined as "for at least 2 epochs"
+        patience=2,
+        verbose=0,
+    )
+]
+
+models_path = 'E:\DataScience\MoA\models'
+
+def load_models(models_path,target=target) :
+    models_dict = {}
+
+    for col in target.keys() :
+        if col == 'sig_id': continue
+        try:
+            models_dict[col] = tf.keras.models.load_model(f'{models_path}/{col}')
+
+        except OSError:
+            pass
+
+    try :
+        models_dict['final'] = tf.keras.models.load_model(f'{models_path}/final')
+    except OSError:
+        pass
+
+    try :
+        with open(f'{models_path}/scores', 'rb') as handle:
+            score_dict = pickle.load(handle)
+    except :
+        score_dict = {}
+
+    return models_dict,score_dict
+
+from sklearn.model_selection import train_test_split,StratifiedKFold,KFold
+from sklearn.metrics import log_loss
+
+def out_of_folds_predict(pipe, X, y) :
+
+    preds = np.zeros(X.shape[0])
+
+    pipe_config = {
+        'clf__epochs':20,
+        'clf__callbacks':callbacks
+    }
+
+    if y.sum() < 2 :
+        kfold = KFold()
+    else :
+        kfold = StratifiedKFold()
+
+    for train_index,test_index in kfold.split(X,y) :
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+
+
+        pipe.fit(X_train,y_train,**pipe_config)
+
+        preds[test_index] = pipe.predict(X_test)
+
+    return preds
+
+def build_preds(models_dict,score_dict,train,target,models_path,seed=0) :
+
+    try :
+        oof_preds = pd.read_csv(f'{models_path}/oof_preds')
+    except :
+        oof_preds = pd.DataFrame(data=train['sig_id'],columns=['sig_id'])
+
+    for col in target.keys() :
+
+        if col == 'sig_id' : continue
+
+        if col in models_dict :
+            print(f'\tAlready fitted {col}')
+
+
+            continue
+
+        print(f'\nFitting {col}...')
+        X = train.iloc[:,1:].copy().values
+        y = target[col].values
+
+        pipe = build_pipe()
+
+        #n = 2
+        #if y.sum() < n :
+        #    X,y = repeat_sample(X=X,y=y,n=n)
+
+        i_preds = out_of_folds_predict(pipe,X,y)
+
+        oof_preds[col] = i_preds
+
+        score = log_loss(target[col],i_preds,labels=[0,1])
+        models_dict[col] = pipe
+        score_dict[col] = score
+
+        oof_preds.to_csv(f'{models_path}/oof_preds')
+        with open(f'{models_path}/scores', 'wb') as handle:
+            pickle.dump(score_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        seed += 1
+        seed_everything(seed)
+
+    return models_dict,score_dict,oof_preds
+
+models_dict,score_dict = load_models(models_path,target)
+models_dict,score_dict,oof_preds = build_preds(models_dict=models_dict,score_dict=score_dict,train=train,
+                                               target=target,models_path=models_path,seed=seed)
+
