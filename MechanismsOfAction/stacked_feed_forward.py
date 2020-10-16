@@ -1,7 +1,10 @@
 import tensorflow as tf
+tf.keras.backend.set_floatx('float64')
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import pandas as pd
 import numpy as np
-import os
 import random
 import pickle
 
@@ -48,7 +51,7 @@ target = target[ctrl_mask]
 train = train[ctrl_mask]
 
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import BatchNormalization,Dropout,Dense
+from tensorflow.keras.layers import BatchNormalization,Dropout,Dense,Input
 from tensorflow_addons.layers import WeightNormalization
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
@@ -82,29 +85,56 @@ def build_pipe():
         loss='binary_crossentropy',
     )
 
-    clf = KerasClassifier(model)
-
-    pipe = Pipeline([
-        ('encoder',OrdinalEncoder()),
-        ('scaler',StandardScaler()),
-        ('clf',clf)
-    ])
-
-    return pipe
 
 
+    return model
 
-callbacks = [
-    EarlyStopping(
-        # Stop training when loss is no longer improving
-        monitor="loss",
-        # "no longer improving" being defined as "no better than 1e-2 less"
-        min_delta=1e-5,
-        # "no longer improving" being further defined as "for at least 2 epochs"
-        patience=2,
-        verbose=0,
-    )
-]
+
+from sklearn.model_selection import StratifiedKFold,KFold
+from sklearn.metrics import log_loss
+
+def out_of_folds_predict(pipe, X, y) :
+    callbacks = [
+        EarlyStopping(
+            # Stop training when loss is no longer improving
+            monitor="loss",
+            # "no longer improving" being defined as "no better than 1e-2 less"
+            min_delta=1e-5,
+            # "no longer improving" being further defined as "for at least 2 epochs"
+            patience=2,
+            verbose=0,
+        )
+    ]
+
+    preds = np.zeros(X.shape[0])
+
+    n_splits = 4
+
+    if y.sum() < 2 :
+        kfold = KFold(n_splits=n_splits)
+    else :
+        kfold = StratifiedKFold(n_splits=n_splits)
+
+    for i,(train_index,test_index) in enumerate(kfold.split(X,y)) :
+        print(f'Split {i+1} of {n_splits}...')
+
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+
+        encoder = OrdinalEncoder()
+        X_train = encoder.fit_transform(X_train,y_train).astype(np.float)
+
+        pipe.fit(X_train,y_train,epochs=20,callbacks=callbacks,verbose=0)
+
+        X_test = encoder.transform(X_test).astype(np.float)
+        pipe.evaluate(X_test,y_test,verbose=1)
+
+        preds[test_index] = pipe.predict(X_test).flatten()
+
+
+
+    return preds
+
 
 models_path = 'E:\DataScience\MoA\models'
 
@@ -116,12 +146,12 @@ def load_models(models_path,target=target) :
         try:
             models_dict[col] = tf.keras.models.load_model(f'{models_path}/{col}')
 
-        except OSError:
+        except :
             pass
 
     try :
         models_dict['final'] = tf.keras.models.load_model(f'{models_path}/final')
-    except OSError:
+    except :
         pass
 
     try :
@@ -132,35 +162,9 @@ def load_models(models_path,target=target) :
 
     return models_dict,score_dict
 
-from sklearn.model_selection import train_test_split,StratifiedKFold,KFold
-from sklearn.metrics import log_loss
-
-def out_of_folds_predict(pipe, X, y) :
-
-    preds = np.zeros(X.shape[0])
-
-    pipe_config = {
-        'clf__epochs':20,
-        'clf__callbacks':callbacks
-    }
-
-    if y.sum() < 2 :
-        kfold = KFold()
-    else :
-        kfold = StratifiedKFold()
-
-    for train_index,test_index in kfold.split(X,y) :
-        X_train, X_test = X[train_index], X[test_index]
-        y_train, y_test = y[train_index], y[test_index]
 
 
-        pipe.fit(X_train,y_train,**pipe_config)
-
-        preds[test_index] = pipe.predict(X_test)
-
-    return preds
-
-def build_preds(models_dict,score_dict,train,target,models_path,seed=0) :
+def build_preds(score_dict,train,target,models_path,seed=0) :
 
     try :
         oof_preds = pd.read_csv(f'{models_path}/oof_preds')
@@ -171,7 +175,7 @@ def build_preds(models_dict,score_dict,train,target,models_path,seed=0) :
 
         if col == 'sig_id' : continue
 
-        if col in models_dict :
+        if col in score_dict :
             print(f'\tAlready fitted {col}')
 
 
@@ -192,19 +196,30 @@ def build_preds(models_dict,score_dict,train,target,models_path,seed=0) :
         oof_preds[col] = i_preds
 
         score = log_loss(target[col],i_preds,labels=[0,1])
-        models_dict[col] = pipe
+        # models_dict[col] = pipe
         score_dict[col] = score
 
+        print(f'\tFitted {col} with score {score_dict[col]}')
+
         oof_preds.to_csv(f'{models_path}/oof_preds')
+        # pipe.save(f'{models_path}/{col}')
+
         with open(f'{models_path}/scores', 'wb') as handle:
             pickle.dump(score_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         seed += 1
         seed_everything(seed)
 
-    return models_dict,score_dict,oof_preds
+    iter = 0
+    total_score = 0
+    for v in score_dict.values() :
+        iter += 1
+        total_score += v
+    print(f'Final Score: {total_score / iter}')
+
+    return score_dict,oof_preds
 
 models_dict,score_dict = load_models(models_path,target)
-models_dict,score_dict,oof_preds = build_preds(models_dict=models_dict,score_dict=score_dict,train=train,
+score_dict,oof_preds = build_preds(score_dict=score_dict,train=train,
                                                target=target,models_path=models_path,seed=seed)
 

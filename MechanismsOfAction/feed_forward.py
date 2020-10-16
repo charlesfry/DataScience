@@ -39,8 +39,7 @@ def clean_df(_df) :
     return df
 
 X = clean_df(train).values
-print(X)
-quit()
+
 Y = target.iloc[:,1:].values
 
 from tensorflow.keras.callbacks import EarlyStopping
