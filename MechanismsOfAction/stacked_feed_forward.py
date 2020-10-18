@@ -16,6 +16,7 @@ def seed_everything(seed=0):
     np.random.seed(seed)
     tf.random.set_seed(seed)
 
+# now seed everything
 seed = 69
 seed_everything(seed)
 
