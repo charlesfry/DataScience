@@ -9,12 +9,19 @@ def main() :
 
     error_packages = []
 
-    try :
+    try:
         import numpy as np
-        print("Numpy version:",np.version.version)
+        print("Numpy version:", np.version.version)
     except ModuleNotFoundError:
         print("numpy not responsive")
         error_packages.append('numpy')
+
+    try:
+        import tpot
+        print("TPOT version:",tpot.__version__)
+    except:
+        print('TPOT not responsive')
+        error_packages.append('TPOT')
 
     try :
         import pandas as pd
