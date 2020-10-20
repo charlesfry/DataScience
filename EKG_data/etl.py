@@ -57,3 +57,4 @@ print(f'{y_train.shape}\n\n')
 for val in pd.Series(y_train) :
     if val: print(val)
 
+# Run tests
