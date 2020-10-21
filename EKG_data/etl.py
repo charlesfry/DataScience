@@ -17,9 +17,12 @@ sampling_rate = 100
 
 # load and convert annotation data
 Y = pd.read_csv(path + 'ptbxl_database.csv',index_col='ecg_id')
+print(Y.head())
 Y.scp_codes = Y.scp_codes.apply(
     lambda x: ast.literal_eval(x)
 )
+quit()
+
 
 # load raw signal data
 X = load_raw_data(df=Y,sampling_rate=sampling_rate,path=path)
