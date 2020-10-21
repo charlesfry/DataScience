@@ -17,11 +17,11 @@ sampling_rate = 100
 
 # load and convert annotation data
 Y = pd.read_csv(path + 'ptbxl_database.csv',index_col='ecg_id')
-print(Y.head())
+
 Y.scp_codes = Y.scp_codes.apply(
     lambda x: ast.literal_eval(x)
 )
-quit()
+
 
 
 # load raw signal data
@@ -36,7 +36,7 @@ agg_df = agg_df[agg_df.diagnostic == 1]
 def aggregate_diagnostic(y_dic:pd.DataFrame) :
     tmp = []
     for key in y_dic.keys() :
-        if key in agg_df.keys() :
+        if key in agg_df.index :
             tmp.append(agg_df.loc[key].diagnostic_class)
     return list(set(tmp))
 
@@ -61,3 +61,4 @@ for val in pd.Series(y_train) :
     if val: print(val)
 
 # Run tests
+scp = pd.read_csv(f'{path}/scp_statements.csv')
