@@ -23,7 +23,6 @@ Y.scp_codes = Y.scp_codes.apply(
 )
 
 
-
 # load raw signal data
 X = load_raw_data(df=Y,sampling_rate=sampling_rate,path=path)
 
