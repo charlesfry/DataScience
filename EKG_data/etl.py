@@ -146,7 +146,50 @@ model,callbacks = build_model()
 
 # model.fit(X_train,Y_train,epochs=50,callbacks=callbacks,batch_size=batch_size,steps_per_epoch=2)
 
-for i in range(10) :
+for i in range(0) :
     print(f'\nFold {i}')
     model.fit(X_train,Y_train,epochs=5,callbacks=callbacks)
     model.evaluate(X_dev,Y_dev)
+
+from tensorflow.keras.layers import Conv2D,MaxPooling2D
+
+def build_cnn() :
+    model = Sequential([
+        Input(batch_input_shape=(None, 1000, 12)),
+
+        BatchNormalization(),
+        Conv2D(32,kernel_size=(5,5),activation='relu'),
+        MaxPooling2D((2,2)),
+        Conv2D(64,(3,3),activation='relu'),
+        MaxPooling2D((2,2)),
+        Conv2D(64,(3,3),activation='relu'),
+
+        Flatten(),
+        BatchNormalization(),
+        Dense(5, activation='sigmoid', kernel_initializer='glorot_normal')
+    ])
+
+    model.compile(
+        optimizer='adam',
+        loss=tf.keras.losses.BinaryCrossentropy(),
+        metrics=['accuracy']
+    )
+
+    callbacks = [
+        EarlyStopping(
+            # Stop training when loss is no longer improving
+            monitor="loss",
+            # "no longer improving" being defined as "no better than 1e-2 less"
+            min_delta=1e-3,
+            # "no longer improving" being further defined as "for at least 2 epochs"
+            patience=2,
+            verbose=1,
+        )
+    ]
+
+    return model, callbacks
+
+mode,callbacks = build_cnn()
+
+model.fit(X_train,Y_train,epochs=50,callbacks=callbacks)
+model.evaluate(X_dev,Y_dev)
