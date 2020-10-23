@@ -58,11 +58,16 @@ def aggregate_diagnostic(y_dic:pd.DataFrame) :
 Y['diagnostic_superclass'] = Y.scp_codes.apply(aggregate_diagnostic)
 
 # split into train/test
+dev_fold = 9
 test_fold = 10
 
 # train
-X_train = X[np.where(Y.strat_fold != test_fold)]
-y_train = Y[Y.strat_fold != test_fold].diagnostic_superclass
+X_train = X[np.where(Y.strat_fold < dev_fold)]
+y_train = Y[Y.strat_fold < dev_fold].diagnostic_superclass
+
+# dev
+X_dev = X[np.where(Y.strat_fold == dev_fold)]
+Y_dev = Y[Y.strat_fold == dev_fold].diagnostic_superclass
 
 # test
 X_test = X[np.where(Y.strat_fold == test_fold)]
@@ -92,6 +97,10 @@ def build_model() :
 
         BatchNormalization(),
         WeightNormalization(Dense(512, activation='relu', kernel_initializer='he_normal')),
+        Dropout(.6),
+
+        BatchNormalization(),
+        WeightNormalization(Dense(512, activation='relu', kernel_initializer='he_normal')),
         Dropout(.4),
 
         BatchNormalization(),
@@ -111,6 +120,7 @@ def build_model() :
     model.compile(
         optimizer='adam',
         loss=tf.keras.losses.BinaryCrossentropy(),
+        metrics=['accuracy']
     )
 
     callbacks = [
@@ -118,7 +128,7 @@ def build_model() :
             # Stop training when loss is no longer improving
             monitor="loss",
             # "no longer improving" being defined as "no better than 1e-2 less"
-            min_delta=1e-5,
+            min_delta=1e-3,
             # "no longer improving" being further defined as "for at least 2 epochs"
             patience=2,
             verbose=1,
@@ -129,8 +139,10 @@ def build_model() :
 
 model,callbacks = build_model()
 
-# batch_size = 1000
+# batch_size = ceil(X_train.size / 2)
 
-model.fit(X_train,Y_train,epochs=30,callbacks=callbacks)
+# model.fit(X_train,Y_train,epochs=50,callbacks=callbacks,batch_size=batch_size,steps_per_epoch=2)
 
-model.score(X_test,Y_test)
+for i in range(10) :
+    model.fit(X_train,Y_train,epochs=5,callbacks=callbacks)
+    model.evaluate(X_dev,Y_dev)
