@@ -85,12 +85,13 @@ Y_train = to_one_hot(Y_train)
 Y_dev = to_one_hot(Y_dev)
 Y_test = to_one_hot(Y_test)
 
-
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense,Dropout,Input,BatchNormalization,Flatten
+from tensorflow.keras.regularizers import L1
 from tensorflow_addons.layers import WeightNormalization
-from tensorflow.keras.callbacks import EarlyStopping
+
+
 
 
 def build_model() :
@@ -126,47 +127,54 @@ def build_model() :
         metrics=['accuracy']
     )
 
-    callbacks = [
-        EarlyStopping(
-            # Stop training when loss is no longer improving
-            monitor="loss",
-            # "no longer improving" being defined as "no better than 1e-2 less"
-            min_delta=1e-3,
-            # "no longer improving" being further defined as "for at least 2 epochs"
-            patience=2,
-            verbose=1,
-        )
-    ]
 
-    return model,callbacks
 
-model,callbacks = build_model()
+    return model
+
+
 
 # batch_size = ceil(X_train.size / 2)
 
 # model.fit(X_train,Y_train,epochs=50,callbacks=callbacks,batch_size=batch_size,steps_per_epoch=2)
 
-for i in range(0) :
-    print(f'\nFold {i}')
-    model.fit(X_train,Y_train,epochs=5,callbacks=callbacks)
-    model.evaluate(X_dev,Y_dev)
+modelllllll = build_model()
 
-from tensorflow.keras.layers import Conv2D,MaxPooling2D
+# evaluate_model(model)
+
+from tensorflow.keras.layers import Conv1D,MaxPooling1D
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Layer,Dense,Dropout,\
+    Activation,Flatten,Reshape,Permute
+from tensorflow.keras.layers import MaxPooling1D,UpSampling1D,Cropping1D
+
+from tensorflow.keras.layers import Conv1DTranspose
+
+from tensorflow.keras import backend as kb
+l2 = tf.keras.regularizers.l2(0.0001)
 
 def build_cnn() :
     model = Sequential([
         Input(batch_input_shape=(None, 1000, 12)),
 
-        BatchNormalization(),
-        Conv2D(32,kernel_size=(5,5),activation='relu'),
-        MaxPooling2D((2,2)),
-        Conv2D(64,(3,3),activation='relu'),
-        MaxPooling2D((2,2)),
-        Conv2D(64,(3,3),activation='relu'),
+        BatchNormalization(axis=1,gamma_regularizer=l2,beta_regularizer=l2),
+        Activation('relu'),
+        Conv1D(32,kernel_size=(3),input_shape=(1000,12),kernel_initializer='he_uniform'),
+        MaxPooling1D((2)),
+        Dropout(.2),
+
+        BatchNormalization(axis=1,gamma_regularizer=l2,beta_regularizer=l2),
+        Activation('relu'),
+        Conv1D(64,(3),kernel_initializer='he_uniform'),
+        MaxPooling1D((2)),
+        Dropout(.2),
+
+        Activation('relu'),
+        Conv1D(128,(3)),
 
         Flatten(),
-        BatchNormalization(),
+        BatchNormalization(gamma_regularizer=l2,beta_regularizer=l2),
         Dense(5, activation='sigmoid', kernel_initializer='glorot_normal')
+        # Dense(1, activation='sigmoid', kernel_initializer='glorot_normal')
     ])
 
     model.compile(
@@ -175,21 +183,69 @@ def build_cnn() :
         metrics=['accuracy']
     )
 
-    callbacks = [
-        EarlyStopping(
-            # Stop training when loss is no longer improving
-            monitor="loss",
-            # "no longer improving" being defined as "no better than 1e-2 less"
-            min_delta=1e-3,
-            # "no longer improving" being further defined as "for at least 2 epochs"
-            patience=2,
-            verbose=1,
-        )
-    ]
 
-    return model, callbacks
+    return model
 
-mode,callbacks = build_cnn()
 
-model.fit(X_train,Y_train,epochs=50,callbacks=callbacks)
-model.evaluate(X_dev,Y_dev)
+
+cnn_model = build_cnn()
+
+from tensorflow.keras.callbacks import EarlyStopping,ReduceLROnPlateau,TensorBoard,ModelCheckpoint,CSVLogger
+
+
+# ----- Model ----- #
+kernel_size = 16
+kernel_initializer = 'he_normal'
+batch_size = 120
+lr = 0.001
+
+callbacks = [ReduceLROnPlateau(monitor='val_loss',
+                                   factor=0.1,
+                                   patience=7,
+                                   min_lr=lr / 100),
+                 EarlyStopping(patience=9,  # Patience should be larger than the one in ReduceLROnPlateau
+                               min_delta=0.00001)]
+callbacks += [TensorBoard(log_dir='./logs', batch_size=batch_size, write_graph=False),
+                  CSVLogger('training.log', append=False)]  # Change append to true if continuing training
+# Save the BEST and LAST model
+callbacks += [ModelCheckpoint('./backup_model_last'),
+                ModelCheckpoint('./backup_model_best', save_best_only=True)]
+
+def find_batch_size(model) :
+    for i in range(X_train.shape[0] // 10,1,-X_train.shape[0] // 50) :
+        print(f'Fitting model with batch size {i}')
+        try:
+            model.fit(X_train, Y_train, epochs=1, batch_size=i)
+            print(f'Success with batch size {i}')
+            return i
+        except:
+            print('\tOOM. Trying with lower batch size')
+
+# ----------------- #
+
+
+
+if __name__ == "__main__":
+
+    batch_size = 700
+
+    cnn_model.fit(X_train, Y_train,
+                  batch_size=batch_size,
+                  epochs=70,
+                  shuffle='batch',
+                  initial_epoch=0,  # If you are continuing an interrupted section change here
+                  callbacks=callbacks,
+                  validation_data=(X_dev, Y_dev),
+                  verbose=1)
+    cnn_model.evaluate(X_test, Y_test)
+
+    from xgboost import XGBClassifier
+    from sklearn.metrics import log_loss
+
+    for i in range(Y_train.shape[1]) :
+        y_train = Y_train[:,i]
+        y_dev = Y_dev[:,i]
+        xgb = XGBClassifier()
+        xgb.fit(X_train,y_train)
+        print(f'\nXGBClassifier performance on column {i}:')
+        print(log_loss(y_dev,xgb.predict_proba(X_dev)))
