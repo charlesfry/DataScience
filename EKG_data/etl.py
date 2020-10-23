@@ -57,13 +57,21 @@ def aggregate_diagnostic(y_dic:pd.DataFrame) :
 # apply diagnostic superclass
 Y['diagnostic_superclass'] = Y.scp_codes.apply(aggregate_diagnostic)
 
+from sklearn.preprocessing import MultiLabelBinarizer
+mlb = MultiLabelBinarizer()
+
+def to_one_hot(Y) :
+    Y = pd.DataFrame(mlb.fit_transform(Y),
+                            columns=mlb.classes_)
+    return Y
+
 # split into train/test
 dev_fold = 9
 test_fold = 10
 
 # train
 X_train = X[np.where(Y.strat_fold < dev_fold)]
-y_train = Y[Y.strat_fold < dev_fold].diagnostic_superclass
+Y_train = Y[Y.strat_fold < dev_fold].diagnostic_superclass
 
 # dev
 X_dev = X[np.where(Y.strat_fold == dev_fold)]
@@ -71,16 +79,11 @@ Y_dev = Y[Y.strat_fold == dev_fold].diagnostic_superclass
 
 # test
 X_test = X[np.where(Y.strat_fold == test_fold)]
-y_test = Y[Y.strat_fold == test_fold].diagnostic_superclass
+Y_test = Y[Y.strat_fold == test_fold].diagnostic_superclass
 
-
-from sklearn.preprocessing import MultiLabelBinarizer
-mlb = MultiLabelBinarizer()
-
-Y_train = pd.DataFrame(mlb.fit_transform(y_train),
-                          columns=mlb.classes_)
-Y_test = pd.DataFrame(mlb.fit_transform(y_test),
-                          columns=mlb.classes_)
+Y_train = to_one_hot(Y_train)
+Y_dev = to_one_hot(Y_dev)
+Y_test = to_one_hot(Y_test)
 
 
 import tensorflow as tf
@@ -144,5 +147,6 @@ model,callbacks = build_model()
 # model.fit(X_train,Y_train,epochs=50,callbacks=callbacks,batch_size=batch_size,steps_per_epoch=2)
 
 for i in range(10) :
+    print(f'\nFold {i}')
     model.fit(X_train,Y_train,epochs=5,callbacks=callbacks)
     model.evaluate(X_dev,Y_dev)
