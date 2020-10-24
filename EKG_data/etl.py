@@ -3,7 +3,6 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import random
-from math import ceil
 import numpy as np
 import pandas as pd
 import wfdb
@@ -86,12 +85,8 @@ Y_dev = to_one_hot(Y_dev)
 Y_test = to_one_hot(Y_test)
 
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense,Dropout,Input,BatchNormalization,Flatten
-from tensorflow.keras.regularizers import L1
+from tensorflow.keras.layers import Input,BatchNormalization
 from tensorflow_addons.layers import WeightNormalization
-
-
 
 
 def build_model() :
@@ -141,15 +136,12 @@ modelllllll = build_model()
 
 # evaluate_model(model)
 
-from tensorflow.keras.layers import Conv1D,MaxPooling1D
+from tensorflow.keras.layers import Conv1D
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Layer,Dense,Dropout,\
-    Activation,Flatten,Reshape,Permute
-from tensorflow.keras.layers import MaxPooling1D,UpSampling1D,Cropping1D
+from tensorflow.keras.layers import Dense,Dropout,\
+    Activation,Flatten
+from tensorflow.keras.layers import MaxPooling1D
 
-from tensorflow.keras.layers import Conv1DTranspose
-
-from tensorflow.keras import backend as kb
 l2 = tf.keras.regularizers.l2(0.0001)
 
 def build_cnn() :
