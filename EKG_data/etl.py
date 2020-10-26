@@ -184,7 +184,6 @@ cnn_model = build_cnn()
 
 from tensorflow.keras.callbacks import EarlyStopping,ReduceLROnPlateau,TensorBoard,ModelCheckpoint,CSVLogger
 
-
 # ----- Model ----- #
 kernel_size = 16
 kernel_initializer = 'he_normal'
