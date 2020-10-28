@@ -5,41 +5,53 @@ def main() :
 
     import sys
     print("Python version:",sys.version)
-    print("Python Version info:",sys.version_info)
+    print("Python Version info:",sys.version_info,'\n')
 
     error_packages = []
 
     try:
         import numpy as np
-        print("Numpy version:", np.version.version)
+        print("\nNumpy version:", np.version.version)
     except ModuleNotFoundError:
         print("numpy not responsive")
         error_packages.append('numpy')
 
     try:
+        import torch
+        print("\nPyTorch version:", torch.version)
+        device_count = torch.cuda.device_count()
+        if device_count < 1 :print('PyTorch does not detect a GPU')
+        else : print(f'{device_count} Devices found.')
+        for i in range(device_count) :
+            print(f' Device {i}: {torch.cuda.get_device_name(i)}')
+    except ModuleNotFoundError:
+        print("PyTorch not responsive")
+        error_packages.append('torch')
+
+    try:
         import tpot
-        print("TPOT version:",tpot.__version__)
+        print("\nTPOT version:",tpot.__version__)
     except:
         print('TPOT not responsive')
         error_packages.append('TPOT')
 
     try :
         import pandas as pd
-        print('pandas version:',pd.__version__)
+        print('\npandas version:',pd.__version__)
     except ModuleNotFoundError:
         print("pandas not responsive")
         error_packages.append('pandas')
 
     try :
         import seaborn as sns
-        print('Seaborn version:',sns.__version__)
+        print('\nSeaborn version:',sns.__version__)
     except ModuleNotFoundError:
         print("seaborn not responsive")
         error_packages.append('seaborn')
 
     try :
         import matplotlib
-        print('matplotlib version:',matplotlib.__version__)
+        print('\nmatplotlib version:',matplotlib.__version__)
     except ModuleNotFoundError:
         print("matplotlib not responsive")
         error_packages.append('matplotlib')
