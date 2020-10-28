@@ -2,6 +2,8 @@ def main() :
     print("This script verifies that certain packages are working")
     print("including: Python itself, numpy, pandas, seaborn, matplotlib,\n"
           "tensorFlow, and tensorFlow's integration with CUDA")
+    import os
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     import sys
     print("Python version:",sys.version)
@@ -27,6 +29,13 @@ def main() :
     except ModuleNotFoundError:
         print("PyTorch not responsive")
         error_packages.append('torch')
+
+    try:
+        import torchvision
+        print("\ntorchvision version:",torchvision.version)
+    except:
+        print('torchvision not responsive')
+        error_packages.append('torchvision')
 
     try:
         import tpot
