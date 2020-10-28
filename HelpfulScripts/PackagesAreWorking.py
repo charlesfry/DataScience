@@ -64,6 +64,7 @@ def main() :
     except ModuleNotFoundError:
         print("matplotlib not responsive")
         error_packages.append('matplotlib')
+
     # separate TensorFlow from the rest of the information
     print('\n-----------------------------')
     try :
