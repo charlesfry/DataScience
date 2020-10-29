@@ -20,25 +20,6 @@ def main() :
         error_packages.append('numpy')
 
     try:
-        import torch
-        print("\nPyTorch version:", torch.version)
-        device_count = torch.cuda.device_count()
-        if device_count < 1 :print('PyTorch does not detect a GPU')
-        else : print(f'{device_count} Devices found.')
-        for i in range(device_count) :
-            print(f' Device {i}: {torch.cuda.get_device_name(i)}')
-    except ModuleNotFoundError:
-        print("PyTorch not responsive")
-        error_packages.append('torch')
-
-    try:
-        import torchvision
-        print("\ntorchvision version:",torchvision.version)
-    except:
-        print('torchvision not responsive')
-        error_packages.append('torchvision')
-
-    try:
         import tpot
         print("\nTPOT version:",tpot.__version__)
     except:
@@ -86,6 +67,25 @@ def main() :
     except ModuleNotFoundError:
         print("error loading physical devices. \nTensorFlow does not use CUDA")
         error_packages.append('CUDA for TensorFlow')
+
+    try:
+        import torch
+        print("\nPyTorch version:", torch.version)
+        device_count = torch.cuda.device_count()
+        if device_count < 1 :print('PyTorch does not detect a GPU')
+        else : print(f'{device_count} Devices found.')
+        for i in range(device_count) :
+            print(f'Device {i}: {torch.cuda.get_device_name(i)}')
+    except ModuleNotFoundError:
+        print("PyTorch not responsive")
+        error_packages.append('torch')
+
+    try:
+        import torchvision
+        print("\ntorchvision version:",torchvision.version)
+    except:
+        print('torchvision not responsive')
+        error_packages.append('torchvision')
     print('-----------------------------\n')
 
 
@@ -103,6 +103,11 @@ def main() :
     print("\nTesting complete")
     if len(error_packages) > 0 :
         print(f'Failed to access: \n{error_packages}')
+    else :
+        if len(tf.config.list_physical_devices('GPU')) > 0 and torch.cuda.device_count() > 0 :
+            print('\nAll packages installed successfully with gpu support')
+        else :
+            print('\nPackages installed, but gpu support not successful')
 
 if __name__ == '__main__' :
     main()
