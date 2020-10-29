@@ -2,6 +2,7 @@ def main() :
     print("This script verifies that certain packages are working")
     print("including: Python itself, numpy, pandas, seaborn, matplotlib,\n"
           "tensorFlow, and tensorFlow's integration with CUDA")
+
     import os
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -70,16 +71,15 @@ def main() :
     try :
         import tensorflow as tf
         print('\nTensorFlow version: {}\n'.format(tf.__version__))
-        has_cuda = tf.test.is_gpu_available(
-            cuda_only=False, min_cuda_compute_capability=None
-        )
+        has_cuda = len(tf.config.list_physical_devices('GPU'))
     except ModuleNotFoundError:
         print("TensorFlow not responsive")
         error_packages.append('TensorFlow')
     try :
         if len(tf.config.list_physical_devices('GPU')):
             print("-----------------------------\n\ntensorflow uses CUDA")
-            print("Device:", tf.config.list_physical_devices('GPU'))
+            for i,device in enumerate(tf.config.list_physical_devices('GPU')) :
+                print(f'Device {i}: {device}')
         else:
             error_packages.append('CUDA for TensorFlow')
             print("tensorflow does not use CUDA")
