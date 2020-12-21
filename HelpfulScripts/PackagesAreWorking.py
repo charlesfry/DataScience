@@ -103,6 +103,7 @@ def main() :
     if len(error_packages) > 0 :
         print(f'Failed to access: \n{error_packages}')
     else :
+        import torch
         if len(tf.config.list_physical_devices('GPU')) > 0 and torch.cuda.device_count() > 0 :
             print('\nAll packages installed successfully with gpu support')
         else :
