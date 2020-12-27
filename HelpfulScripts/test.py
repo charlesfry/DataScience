@@ -1,6 +1,7 @@
 import numpy as np
 import cv2 as cv
 import time
+import cv2.cuda
 
 rand = np.random.random((1024, 1024)).astype(np.float32)
 h_array1 = np.stack([rand, rand],axis=2)
