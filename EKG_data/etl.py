@@ -38,7 +38,6 @@ Y.scp_codes = Y.scp_codes.apply(
     lambda x: ast.literal_eval(x)
 )
 
-
 # load raw signal data
 X = load_raw_data(df=Y,sampling_rate=sampling_rate,path=path)
 
