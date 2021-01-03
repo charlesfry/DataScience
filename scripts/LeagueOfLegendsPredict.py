@@ -114,7 +114,6 @@ from sklearn.ensemble import RandomForestClassifier
 # create empty model dictionary that will contain the model under its name
 models = {}
 
-
 # define our models and add them to our model dictionary
 logit = make_pipeline(RobustScaler(),
                       LogisticRegression(random_state=seed, max_iter=1000,n_jobs=-1))
