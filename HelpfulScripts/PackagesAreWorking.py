@@ -70,7 +70,7 @@ def main() :
 
     try:
         import torch
-        print("\nPyTorch version:", torch.version)
+        print("\nPyTorch version:", torch.__version__)
         device_count = torch.cuda.device_count()
         if device_count < 1 :print('PyTorch does not detect a GPU')
         else : print(f'{device_count} Devices found.')
@@ -82,10 +82,17 @@ def main() :
 
     try:
         import torchvision
-        print("\ntorchvision version:",torchvision.version)
+        print("\ntorchvision version:", torchvision.__version__)
     except:
         print('torchvision not responsive')
         error_packages.append('torchvision')
+    try:
+        import torchaudio
+        torchaudio.USE_SOUNDFILE_LEGACY_INTERFACE = False
+        print("\ntorchvision version:",torchaudio.__version__)
+    except:
+        print('torchvision not responsive')
+        error_packages.append('torchaudio')
     print('-----------------------------\n')
 
     import os
