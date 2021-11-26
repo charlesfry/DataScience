@@ -9,7 +9,6 @@ def main() :
     import sys
     print("Python version:",sys.version)
     print("Python Version info:",sys.version_info,'\n')
-
     error_packages = []
 
     try:
@@ -19,12 +18,12 @@ def main() :
         print("numpy not responsive")
         error_packages.append('numpy')
 
-    try:
-        import tpot
-        print("\nTPOT version:",tpot.__version__)
-    except:
-        print('TPOT not responsive')
-        error_packages.append('TPOT')
+    # try:
+    #     import tpot
+    #     print("\nTPOT version:",tpot.__version__)
+    # except:
+    #     print('TPOT not responsive')
+    #     error_packages.append('TPOT')
 
     try :
         import pandas as pd
@@ -95,16 +94,13 @@ def main() :
         error_packages.append('torchaudio')
     print('-----------------------------\n')
 
-    import os
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-    try :
-        from mlagents_envs.environment import UnityEnvironment
-        poo = UnityEnvironment.behavior_specs
-        print("ML-Agents imported successfully")
-    except ModuleNotFoundError:
-        print("Unity ML-Agents not installed")
-        error_packages.append('ML-Agents')
+    # try :
+    #     from mlagents_envs.environment import UnityEnvironment
+    #     poo = UnityEnvironment.behavior_specs
+    #     print("ML-Agents imported successfully")
+    # except ModuleNotFoundError:
+    #     print("Unity ML-Agents not installed")
+    #     error_packages.append('ML-Agents')
 
     print("\nTesting complete")
     if len(error_packages) > 0 :
@@ -115,6 +111,9 @@ def main() :
             print('\nAll packages installed successfully with gpu support')
         else :
             print('\nPackages installed, but gpu support not successful')
+
+    from datetime import datetime
+    os.system(f'python -m pip freeze > requirements.{datetime.now().date().strftime("%Y%m%d")}.txt')
 
 if __name__ == '__main__' :
     main()
