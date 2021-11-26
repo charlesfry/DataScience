@@ -187,7 +187,7 @@ traitlets==4.3.3
 twine==3.2.0
 twitterscraper==1.4.0
 tzlocal==2.1
-urllib3==1.25.9
+urllib3==1.26.5
 validators==0.15.0
 virtualenv==20.0.25
 wandb==0.9.3
