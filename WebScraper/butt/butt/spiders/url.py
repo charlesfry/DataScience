@@ -24,7 +24,7 @@ class UrlSpider(CrawlSpider):
                   follow=True,
                   process_request='splash_request'
                   )
-             ]
+             ]        
     
     def start_requests(self):
         for i, url in enumerate(self.start_urls):
@@ -35,6 +35,15 @@ class UrlSpider(CrawlSpider):
                 },
                 'cookiejar': i
             })
+            
+    def splash_request(self, response):
+        yield SplashRequest(response.url, self.parse, meta={
+                'splash': {
+                    'endpoint': 'render.html',
+                    'args': {'wait': WAIT}
+                },
+                'cookiejar': response.meta['cookiejar']
+            })
     
     def parse(self, response):
         self.links.add(response.url)
@@ -42,7 +51,7 @@ class UrlSpider(CrawlSpider):
         urls = {u.url for u in extracted_links}
         for url in urls - self.links:
             if url in self.links: continue # double check
-            self.links.add(url)
+            self.parse(url)
             yield SplashRequest(url, self.parse_items, meta={
                 'splash': {
                     'endpoint': 'render.html',
