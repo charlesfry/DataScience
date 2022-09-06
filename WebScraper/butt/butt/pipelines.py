@@ -8,7 +8,6 @@
 
 from scrapy import signals
 from scrapy.exporters import XmlItemExporter
-
 from itemadapter import ItemAdapter
 
 class ButtPipeline:
@@ -18,7 +17,9 @@ class ButtPipeline:
 class XmlExportPipeline(object):
     
     def __init__(self):
+        self.file = open('urls.xml', 'w+b')
         self.files = {}
+        self.exporter = XmlItemExporter(self.file)
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -28,16 +29,15 @@ class XmlExportPipeline(object):
         return pipeline
 
     def spider_opened(self, spider):
-        file = open('%s_urls.xml' % spider.name, 'w+b')
-        self.files[spider] = file
-        self.exporter = XmlItemExporter(file)
+        self.files[spider] = self.file
+        
         self.exporter.start_exporting()
 
     def spider_closed(self, spider):
         self.exporter.finish_exporting()
-        file = self.files.pop(spider)
-        file.close()
-        xml_pipeline(file)
+        # self.file = self.files.pop(spider)
+        self.file.close()
+        xml_pipeline(self.file)
 
     def process_item(self, item, spider):
         self.exporter.export_item(item)

@@ -8,31 +8,27 @@ from datetime import datetime
 
 ### trying with scrapy-splash
 from scrapy_splash import SplashRequest
-WAIT = 10
+WAIT = 4
 DOMAIN = 'jacksoncontrol.com'
+
 class UrlSpider(CrawlSpider):
     name = 'url'
     allowed_domains = [DOMAIN]
     start_urls = ['https://shop.' + DOMAIN + '/']
     meta = {'dont_redirect': True, 'handle_httpstatus_list': [301, 302]}
     links=set()
-
-    rules = [Rule(LinkExtractor(allow=r"http[s]?://shop." + DOMAIN,
-                                deny='http[s]?://auth.shop.' + DOMAIN), 
-                  callback='parse_item', 
+    le = LinkExtractor(allow=r"http[s]?://shop." + DOMAIN, 
+                       deny=r"http[s]?://auth.shop." + DOMAIN)
+    rules = [Rule(le, 
+                  callback='parse', 
                   follow=True,
                   process_request='splash_request'
                   )
              ]
     
-    le = LinkExtractor(allow=r"http[s]?://shop.jacksoncontrol.com", deny='')
-
-    def splash_request(self, request):
-        return SplashRequest(url=request.url, args={'wait': WAIT}, meta={'real_url': request.url})
-    
     def start_requests(self):
         for i, url in enumerate(self.start_urls):
-            yield SplashRequest(url, self.parse_items, meta={
+            yield SplashRequest(url, self.parse, meta={
                 'splash': {
                     'endpoint': 'render.html',
                     'args': {'wait': WAIT}
@@ -40,11 +36,10 @@ class UrlSpider(CrawlSpider):
                 'cookiejar': i
             })
     
-    def parse_items(self, response):
+    def parse(self, response):
         self.links.add(response.url)
         extracted_links = self.le.extract_links(response)
         urls = {u.url for u in extracted_links}
-        self.parse(response)
         for url in urls - self.links:
             if url in self.links: continue # double check
             self.links.add(url)
@@ -52,11 +47,12 @@ class UrlSpider(CrawlSpider):
                 'splash': {
                     'endpoint': 'render.html',
                     'args': {'wait': WAIT}
-                }
+                },
+                'cookiejar': response.meta['cookiejar']
             })
 
     
-    def parse(self, response):
+    def parse_items(self, response):
         yield {'loc':url_query_cleaner(response.url),
                'status':response.status,
                'lastedit':datetime.now().strftime("%m/%d/%Y %H:%M:%S")
