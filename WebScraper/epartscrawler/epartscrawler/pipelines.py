@@ -99,6 +99,3 @@ class EpartscrawlerPipeline:
         self.exporter.export_item(item)
         return item
 '''
-
-from scrapy import signals
-from scrapy.exporters import XmlItemExporter

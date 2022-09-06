@@ -1,4 +1,4 @@
-# Scrapy settings for simple project
+# Scrapy settings for butt project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -7,17 +7,22 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = 'simple'
+SPLASH_URL = 'http://localhost:8050'
+DUPEFILTER_CLASS = 'scrapy_splash.SplashAwareDupeFilter'
+HTTPCACHE_STORAGE = 'scrapy_splash.SplashAwareFSCacheStorage'
 
-SPIDER_MODULES = ['simple.spiders']
-NEWSPIDER_MODULE = 'simple.spiders'
-HTTPERROR_ALLOWED_CODES = [301]
+BOT_NAME = 'butt'
+
+SPIDER_MODULES = ['butt.spiders']
+NEWSPIDER_MODULE = 'butt.spiders'
+
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-USER_AGENT = 'buttplug (https://shop.jacksoncontrol.com/)'
+# USER_AGENT = 'butt (+http://www.jacksoncontrol.com)'
+USER_AGENT = 'Mozilla/5.0 (Windows NT 5.1; rv:5.0) Gecko/20100101 Firefox/5.0'
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
@@ -25,13 +30,13 @@ ROBOTSTXT_OBEY = True
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-#DOWNLOAD_DELAY = 3
+DOWNLOAD_DELAY = 4
 # The download delay setting will honor only one of:
-#CONCURRENT_REQUESTS_PER_DOMAIN = 16
+CONCURRENT_REQUESTS_PER_DOMAIN = 10
 #CONCURRENT_REQUESTS_PER_IP = 16
 
 # Disable cookies (enabled by default)
-#COOKIES_ENABLED = False
+COOKIES_ENABLED = True
 
 # Disable Telnet Console (enabled by default)
 #TELNETCONSOLE_ENABLED = False
@@ -44,16 +49,25 @@ ROBOTSTXT_OBEY = True
 
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
-#SPIDER_MIDDLEWARES = {
-#    'simple.middlewares.SimpleSpiderMiddleware': 543,
-#}
+SPIDER_MIDDLEWARES = {
+#    'butt.middlewares.ButtSpiderMiddleware': 543,
+    'scrapy_splash.SplashDeduplicateArgsMiddleware': 100,
+}
+
+# FROM RANDOM-USERAGENT
+# https://github.com/cnu/scrapy-random-useragent
+USER_AGENT_LIST = "./useragents.txt"
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
-#DOWNLOADER_MIDDLEWARES = {
-#    'simple.middlewares.SimpleDownloaderMiddleware': 543,
-#}
-
+DOWNLOADER_MIDDLEWARES = {
+    'scrapy.contrib.downloadermiddleware.useragent.UserAgentMiddleware': None, # FROM RANDOM-USERAGENT
+    'random_useragent.RandomUserAgentMiddleware': 400, # FROM RANDOM-USERAGENT
+    'scrapy_splash.SplashCookiesMiddleware': 723,
+    'scrapy_splash.SplashMiddleware': 725,
+    'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 810,
+#    'butt.middlewares.ButtDownloaderMiddleware': 543,
+}
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
 #EXTENSIONS = {
@@ -62,9 +76,10 @@ ROBOTSTXT_OBEY = True
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'simple.pipelines.SimplePipeline': 300,
-#}
+ITEM_PIPELINES = {
+#    'butt.pipelines.ButtPipeline': 300,
+   'butt.pipelines.XmlExportPipeline': 420,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
