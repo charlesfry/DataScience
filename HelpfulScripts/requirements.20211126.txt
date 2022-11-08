@@ -163,7 +163,7 @@ pluggy @ file:///C:/ci/pluggy_1615976440052/work
 ply==3.11
 prometheus-client @ file:///tmp/build/80754af9/prometheus_client_1618088486455/work
 prompt-toolkit @ file:///tmp/build/80754af9/prompt-toolkit_1616415428029/work
-protobuf==3.19.1
+protobuf==3.19.5
 psutil @ file:///C:/ci/psutil_1612298199233/work
 ptyprocess @ file:///tmp/build/80754af9/ptyprocess_1609355006118/work/dist/ptyprocess-0.7.0-py2.py3-none-any.whl
 py @ file:///tmp/build/80754af9/py_1607971587848/work
