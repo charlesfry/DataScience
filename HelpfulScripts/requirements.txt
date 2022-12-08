@@ -31,7 +31,7 @@ captum==0.3.0
 cartpole==0.0.1
 catalogue==1.0.0
 cattrs==1.0.0
-certifi==2020.12.5
+certifi==2022.12.7
 chess==1.3.0
 click==7.1.2
 cloudpickle==1.6.0
