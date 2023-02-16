@@ -256,7 +256,7 @@ validators==0.18.1
 wandb==0.10.9
 wasabi==0.8.0
 webencodings==0.5.1
-Werkzeug==1.0.1
+Werkzeug==2.2.3
 widgetsnbextension==3.5.1
 win-unicode-console==0.5
 wincertstore==0.2
